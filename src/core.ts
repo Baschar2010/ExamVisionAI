@@ -19,6 +19,49 @@ export type Evaluation = {
 };
 
 const stopWords = new Set(('und der die das ist im in den des dem ein eine einer eines mit von zu für auf als auch durch bei wird werden sich nicht nach oder um aus an er sie es diese dieser über unter zum zur wie was wer wenn sind kann können war waren haben hat hatte the a an of to and is are was were has have had this that these those it its their they them which what when where as for by from at into through than then will with not more one each both main types type discussed lesson three four five two first second describe explain compare list name state calculate give show identify').split(' '));
+for (const word of ('aufgabe aufgaben frage fragen teilaufgabe antworten antwort lösung muster points punkte textstelle textstellen unterlage unterlagen belegstelle belegstellen dokument dokumente kapitel seite seiten bitte nenne bisher folgende folgenden falls jedoch daher deshalb somit sowie innerhalb außerhalb zwischen ohne wegen dir ihr ihnen uns mein meine dein deine sein seine unser ihre deren wessen wobei woran worum wofür wogegen indem schon noch nur auch bereits etwa circa beispiel beispielweise approximately approx example examples section sections chapter chapters page pages answer answers solution solutions task tasks question questions materials material source sources evidence erläutere begründe beschreibe vergleiche').split(/\s+/)) stopWords.add(word);
+
+export type Difficulty = 'easy' | 'medium' | 'hard';
+export type BuildOptions = { difficulty?: Difficulty };
+const difficultyIndicators = ('analyse analysiere analysieren auswerte auswerten bewerte bewerten begründe begründen hypothesen hypothese modell modelle variabel variablen abhängig abhängigkeit abhängigkeiten verhältnis verhältnisse zusammenhang zusammenhänge struktur prozess vorgang mechanismus wirkung ursache folge konsequenz bilanz bilanzieren ableiten ableitung experimentelle experimentell messwerte messung empirisch theoretisch komplex comparison contrast difference distinction derive mechanism relationship dependence process structure consequence evidence evaluation critical evaluate compare').split(/\s+/);
+function difficultyScore(s: string): number {
+  const text = s.toLocaleLowerCase();
+  const wordCount = terms(s).length;
+  const longWords = (s.toLocaleLowerCase().match(/[\p{L}]{9,}/gu) || []).length;
+  const numbers = (s.match(/\d/g) || []).length;
+  const sentences = Math.max(1, textParts(s).length);
+  const indicatorHits = difficultyIndicators.filter(word => word.length > 3 && text.includes(word)).length;
+  return longWords * 1.4 + numbers * .8 + indicatorHits * 2.5 + wordCount / sentences / 4 + Math.min(6, s.length / 100);
+}
+export function difficultyOf(s: string): Difficulty {
+  const score = difficultyScore(s);
+  return score >= 12 ? 'hard' : score >= 5.5 ? 'medium' : 'easy';
+}
+export function difficultyReport(passages: SourcePassage[]) {
+  const counts: Record<Difficulty, number> = { easy: 0, medium: 0, hard: 0 };
+  let wordSum = 0, lengthSum = 0;
+  for (const passage of passages) {
+    counts[difficultyOf(passage.text)]++;
+    wordSum += terms(passage.text).length;
+    lengthSum += passage.text.length;
+  }
+  const total = Math.max(1, passages.length);
+  const dominant = (Object.keys(counts) as Difficulty[]).sort((a, b) => counts[b] - counts[a])[0];
+  return { counts, averageWords: Math.round(wordSum / total), averageLength: Math.round(lengthSum / total), dominant };
+}
+export function effectiveStyle(profile: TemplateProfile | undefined, difficulty: Difficulty = 'medium'): TemplateProfile | undefined {
+  if (!profile) return undefined;
+  const taskKinds = [...(profile.taskKinds || [])];
+  if (difficulty === 'easy') {
+    if (!taskKinds.includes('recall')) taskKinds.unshift('recall');
+    if (!taskKinds.includes('describe')) taskKinds.push('describe');
+  } else if (difficulty === 'hard') {
+    if (!taskKinds.includes('compare')) taskKinds.unshift('compare');
+    if (!taskKinds.includes('calculate')) taskKinds.push('calculate');
+  }
+  // The old paper defines points and structure; difficulty only changes emphasis and passage choice.
+  return { ...profile, taskKinds: taskKinds.length ? taskKinds : profile.taskKinds };
+}
 const conceptAliases: string[][] = [
   ['radiation', 'strahlung', 'strahlen', 'ray', 'rays'], ['alpha', 'alphastrahlung'], ['beta', 'betastrahlung'], ['gamma', 'gammastrahlung'],
   ['stopped', 'stoppen', 'gestoppt', 'blocked', 'blockiert', 'absorbed', 'absorbiert', 'halten'],
@@ -108,7 +151,9 @@ export function evaluateAnswer(reference: string, response: string, maxPoints: n
   };
 }
 
-export function buildGroundedQuestions(passages: SourcePassage[], count: number, profile?: TemplateProfile) {
+export function buildGroundedQuestions(passages: SourcePassage[], count: number, profile?: TemplateProfile, options: BuildOptions = {}) {
+  const difficulty = options.difficulty || 'medium';
+  const style = effectiveStyle(profile, difficulty);
   const unique = new Map<string, SourcePassage>();
   for (const passage of passages) {
     const key = passage.text.toLocaleLowerCase().replace(/\W/g, '').slice(0, 120);
@@ -116,17 +161,23 @@ export function buildGroundedQuestions(passages: SourcePassage[], count: number,
   }
   const available = [...unique.values()].filter(x => terms(x.text).length >= 4);
   const limit = Math.min(Math.max(1, count), available.length);
-  const selected = available.sort((a, b) => a.text.length - b.text.length);
+  const selected = [...available];
+  if (difficulty === 'easy') selected.sort((a, b) => a.text.length - b.text.length || terms(a.text).length - terms(b.text).length);
+  else if (difficulty === 'hard') selected.sort((a, b) => difficultyScore(b.text) - difficultyScore(a.text) || b.text.length - a.text.length);
+  else selected.sort((a, b) => a.text.length - b.text.length);
   const chosen = Array.from({ length: limit }, (_, i) => selected[Math.floor((i + .5) * selected.length / limit)]);
-  const kinds = profile?.taskKinds || [];
+  const kinds = style?.taskKinds || [];
+  const fallbackKinds: Record<Difficulty, string[]> = { easy: ['recall', 'describe'], medium: ['explain', 'describe'], hard: ['compare', 'calculate', 'explain'] };
   return chosen.map((p, i) => {
-    const kind = kinds.length ? kinds[i % kinds.length] : 'explain';
+    const kind = kinds.length ? kinds[i % kinds.length] : fallbackKinds[difficulty][i % fallbackKinds[difficulty].length];
     const prompt = kind === 'recall' ? `Nenne die in den Unterlagen beschriebene Kernaussage zu „${p.topic}“.`
       : kind === 'compare' ? `Vergleiche die in dieser Textstelle genannten Aspekte zu „${p.topic}“. Verwende nur Angaben aus den Unterlagen.`
       : kind === 'calculate' ? `Welche Größen und Beziehungen werden in dieser Textstelle zu „${p.topic}“ ausdrücklich genannt? Erläutere sie.`
       : kind === 'describe' ? `Beschreibe den in den Unterlagen dargestellten Sachverhalt zu „${p.topic}“.`
       : `Erkläre die Kernaussage der Unterlagen zu „${p.topic}“ mit eigenen Worten.`;
-    const point = profile?.pointValues?.length ? profile.pointValues[i % profile.pointValues.length] : Math.max(1, Math.min(4, Math.ceil(p.text.length / 170)));
+    const basePoint = Math.max(1, Math.min(4, Math.ceil(p.text.length / 170)));
+    const adjusted = difficulty === 'hard' ? basePoint + 1 : difficulty === 'easy' ? Math.max(1, basePoint - 1) : basePoint;
+    const point = style?.pointValues?.length ? style.pointValues[i % style.pointValues.length] : adjusted;
     return { id: crypto.randomUUID(), prompt, answer: p.text, source: p.name, topic: p.topic, points: point, response: '' };
   });
 }
