@@ -41,7 +41,9 @@ export function validateQuestions(raw: unknown, sources: string[], maxQuestions:
     if (typeof q.topic !== 'string' || !q.topic.trim() || !termsIn(q.topic).some(t => termsIn(sources[sourceIndex]).includes(t))) throw new Error('Thema ist nicht im zugehörigen Materialauszug belegt.');
     const points = Number(q.points);
     if (!Number.isInteger(points) || points < 1 || points > 20) throw new Error('Punkteangabe ist ungültig.');
-    return { prompt: q.prompt.slice(0, 500), answer: q.answer.slice(0, 2000), evidence: q.evidence, sourceIndex, topic: q.topic.slice(0, 100), points };
+    const answer = q.answer.trim();
+    if (!sources[sourceIndex].includes(answer)) throw new Error('Die Musterlösung muss wörtlich im Material belegt sein.');
+    return { prompt: q.prompt.slice(0, 500), answer: answer.slice(0, 2000), evidence: q.evidence, sourceIndex, topic: q.topic.slice(0, 100), points };
   });
 }
 
@@ -51,6 +53,20 @@ export function validateGrade(raw: unknown, maxPoints: number): AiGrade {
   const points = Number(value.points), confidence = Number(value.confidence);
   if (!Number.isFinite(points) || points < 0 || points > maxPoints || !Number.isFinite(confidence) || confidence < 0 || confidence > 1 || typeof value.explanation !== 'string' || !Array.isArray(value.missing)) throw new Error('KI-Bewertung entspricht nicht dem erwarteten Schema.');
   return { points: Math.round(points), explanation: value.explanation.slice(0, 800), missing: value.missing.filter((x: unknown) => typeof x === 'string').slice(0, 12), confidence };
+}
+
+export function validateGrades(raw: unknown, items: Array<{ id: string; points: number }>): Record<string, AiGrade> {
+  if (!raw || typeof raw !== 'object' || !Array.isArray((raw as any).grades)) throw new Error('Antwortschema für die KI-Korrektur ist ungültig.');
+  const validIds = new Set(items.map(item => item.id));
+  const result: Record<string, AiGrade> = {};
+  for (const entry of (raw as any).grades as any[]) {
+    const id = typeof entry?.id === 'string' ? entry.id : '';
+    const item = items.find(x => x.id === id);
+    if (!validIds.has(id) || !item || result[id]) throw new Error('KI-Korrektur enthält eine unbekannte oder doppelte Aufgabe.');
+    result[id] = validateGrade(entry, item.points);
+  }
+  if (!Object.keys(result).length) throw new Error('KI-Korrektur lieferte keine Bewertungen.');
+  return result;
 }
 
 function termsIn(value: string) { return (value.toLocaleLowerCase().match(/[\p{L}]{4,}/gu) || []).filter(x => !['that','this','with','from','into','about','their','which','have','been','were','über','diese','dieser','einer','eines','dass','eine'].includes(x)); }

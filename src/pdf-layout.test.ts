@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { buildExamPdfBlocks, isRtlText, paginateBlocks, wrapText } from './pdf-layout.ts';
+import { buildExamPdfBlocks, buildReportPdfBlocks, isRtlText, paginateBlocks, wrapText } from './pdf-layout.ts';
 
 test('long words and wrapped text never exceed the requested width', () => {
   const lines = wrapText('kurz Absorptionsvermögen von Gammastrahlung', 12);
@@ -32,4 +32,17 @@ test('pagination starts a new page before the bottom margin and resets y', () =>
   assert.equal(pages.length, 4);
   assert.equal(pages[0].length, 2);
   assert.equal(pages[1][0].y, 20);
+});
+
+test('learning report blocks keep Arabic topics and paginate without clipping', () => {
+  const blocks = buildReportPdfBlocks(
+    { title: 'Lernfortschritt', submitted: 3, minutes: 90, percent: 72, weakest: ['اشعة'], topics: [{ topic: 'اشعة الفا', percent: 40, earned: 2, possible: 5 }], trend: [{ label: 'Nov 26', percent: 72 }] },
+    { exams: 'Arbeiten', minutes: 'Minuten', average: 'Durchschnitt', weak: 'Wiederholen', none: 'keine', topics: 'Themen', trend: 'Trend' }
+  );
+  const lines = blocks.flatMap(block => block.lines);
+  assert.ok(lines.some(line => line.text.includes('اشعة الفا') && line.rtl));
+  assert.ok(lines.every(line => line.height > 0 && wrapText(line.text, 200).length >= 1));
+  const pages = paginateBlocks(blocks, { top: 20, bottom: 60 });
+  assert.ok(pages.length >= 2);
+  assert.ok(pages.every(page => page.every(line => (line.y || 0) + line.height <= 60)));
 });

@@ -39,14 +39,15 @@ function line(text: string, x: number, size: number, gapAfter = 0): PdfBlock {
   };
 }
 
-export function buildExamPdfBlocks(exam: PdfExam, answers: boolean, labels: { date: string; points: string; solution: string; answer: string; achieved: string }): PdfBlock[] {
+export function buildExamPdfBlocks(exam: PdfExam, answers: boolean, labels: { date: string; points: string; solution: string; answer: string; achieved: string; pointsShort?: string }): PdfBlock[] {
   const blocks: PdfBlock[] = [
     line('ExamVision AI', 18, 20, 10),
     line(exam.title.slice(0, 120), 18, 13, 6),
     line(`${labels.date}: ${new Date(exam.created).toLocaleDateString()}   |   ${labels.points}: ${exam.questions.reduce((sum, q) => sum + q.points, 0)}`, 18, 10, 12)
   ];
   exam.questions.forEach((question, index) => {
-    const prefix = answers && question.earned !== undefined ? `${index + 1}. ${question.prompt} (${question.earned}/${question.points} ${labels.achieved})` : `${index + 1}. ${question.prompt} (${question.points} P.)`;
+    const short = labels.pointsShort || 'P.';
+    const prefix = answers && question.earned !== undefined ? `${index + 1}. ${question.prompt} (${question.earned}/${question.points} ${labels.achieved})` : `${index + 1}. ${question.prompt} (${question.points} ${short})`;
     blocks.push(line(prefix, 18, 11, 2));
     if (answers) {
       blocks.push(line(`${labels.solution}: ${question.answer}`, 22, 9, 3));
@@ -56,6 +57,44 @@ export function buildExamPdfBlocks(exam: PdfExam, answers: boolean, labels: { da
       blocks[blocks.length - 1].gapAfter = 5;
     }
   });
+  return blocks;
+}
+
+export type ReportData = {
+  title: string;
+  submitted: number;
+  minutes: number;
+  percent: number;
+  weakest: string[];
+  topics: Array<{ topic: string; percent: number; earned: number; possible: number }>;
+  trend: Array<{ label: string; percent: number }>;
+};
+export type ReportLabels = {
+  exams: string;
+  minutes: string;
+  average: string;
+  weak: string;
+  none: string;
+  topics: string;
+  trend: string;
+};
+
+export function buildReportPdfBlocks(data: ReportData, labels: ReportLabels): PdfBlock[] {
+  const blocks: PdfBlock[] = [
+    line(data.title, 18, 18, 8),
+    line(`${labels.exams}: ${data.submitted}`, 18, 11, 2),
+    line(`${labels.minutes}: ${data.minutes} min`, 18, 11, 2),
+    line(`${labels.average}: ${data.percent}%`, 18, 11, 6),
+    line(`${labels.weak}: ${data.weakest.join(', ') || labels.none}`, 18, 10, 8),
+    line(labels.topics, 18, 13, 3)
+  ];
+  for (const topic of data.topics.slice(0, 14)) {
+    blocks.push(line(`${topic.topic}: ${topic.percent}% (${topic.earned}/${topic.possible})`, 22, 9, 1));
+  }
+  if (data.trend.length) {
+    blocks.push(line(labels.trend, 18, 13, 3));
+    for (const point of data.trend) blocks.push(line(`${point.label}: ${point.percent}%`, 22, 9, 1));
+  }
   return blocks;
 }
 

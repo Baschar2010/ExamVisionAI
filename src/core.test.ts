@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { analyzeTemplate, buildGroundedQuestions, evaluateAnswer, extractAnswerAssignments, textParts } from './core.ts';
-import { validateAiConfig, validateGrade, validateQuestions } from './ai-provider.ts';
+import { analyzeTemplate, buildGroundedQuestions, difficultyOf, difficultyReport, evaluateAnswer, extractAnswerAssignments, textParts } from './core.ts';
+import { validateAiConfig, validateGrade, validateGrades, validateQuestions } from './ai-provider.ts';
 
 test('PDF sentence extraction preserves distinct source passages', () => {
   const parts = textParts('Radiation has three types: alpha, beta and gamma. Each type has different penetrating power and shielding.');
@@ -65,4 +65,62 @@ test('AI question validation rejects evidence absent from current lessons', () =
 test('AI grade schema limits points to question total', () => {
   assert.throws(() => validateGrade({ points: 6, confidence: .8, explanation: 'Good.', missing: [] }, 4), /Schema/);
   assert.equal(validateGrade({ points: 2, confidence: .6, explanation: 'Some evidence.', missing: ['shielding'] }, 4).points, 2);
+});
+
+test('difficulty analysis separates easy, medium and hard passages', () => {
+  const easy = difficultyOf('The system uses a simple model with a small part.');
+  const hard = difficultyOf('Analysiere die komplexe Abhängigkeit zwischen Struktur, Wirkungsmechanismus und empirischen Messwerten; bewerte die Konsequenzen und leite ein Modell ab.');
+  assert.ok(['easy', 'medium'].includes(easy));
+  assert.equal(hard, 'hard');
+  const report = difficultyReport([{ text: easy === 'easy' ? 'Kurz und einfach.' : 'Analysiere komplexe Zusammenhänge und Abhängigkeiten empirischer Messwerte.', name: 'a', topic: 'a' }]);
+  assert.equal(report.counts.hard + report.counts.medium + report.counts.easy, 1);
+  assert.equal(report.averageWords >= 0, true);
+});
+
+test('template analysis also works after PDF text extraction collapsed line breaks', () => {
+  const profile = analyzeTemplate('Aufgabe 1 (a) Erkläre die Strahlung. 4 Punkte Aufgabe 2 (b) Vergleiche Alpha und Beta. 6 Punkte');
+  assert.equal(profile.questionCount, 2);
+  assert.deepEqual(profile.pointValues, [4, 6]);
+  assert.ok(profile.taskKinds.includes('compare'));
+});
+
+test('one numbered answer in a single-question exam is mapped without guessing', () => {
+  const assignments = extractAnswerAssignments('1. Alpha radiation is stopped by paper.', 1);
+  assert.equal(assignments.get(0), 'Alpha radiation is stopped by paper.');
+});
+
+test('question prompts follow the selected app language', () => {
+  const passages = textParts('Alpha radiation is stopped by paper. Gamma radiation is reduced by thick lead.')
+    .map(text => ({ text, name: 'material.pdf', topic: 'alpha' }));
+  for (const [lang, pattern] of [
+    ['en', /State the key point/], ['ar', /اذكر الفكرة/], ['fr', /Énoncez le point/], ['es', /Indica la idea/]
+  ] as const) {
+    const questions = buildGroundedQuestions(passages, 1, undefined, { language: lang, difficulty: 'easy' });
+    assert.match(questions[0].prompt, pattern);
+  }
+});
+
+test('evaluation accepts general paraphrases beyond the original physics topic', () => {
+  const result = evaluateAnswer('The increase of the temperature causes a decrease of the pressure.', 'Steigende Temperatur verursacht sinkenden Druck.', 4);
+  assert.ok(result.points >= 2);
+  assert.ok(result.ratio > .3);
+});
+
+test('AI question answers must be verbatim in the current material', () => {
+  const source = 'Alpha radiation is stopped by paper and is one of the three radiation types described here.';
+  assert.throws(() => validateQuestions({ questions: [{ prompt: 'Explain the source?', answer: 'An invented answer.', evidence: source, sourceIndex: 0, topic: 'radiation', points: 2 }] }, [source], 2), /wörtlich/);
+  const valid = validateQuestions({ questions: [{ prompt: 'Explain the source?', answer: 'Alpha radiation is stopped by paper', evidence: source, sourceIndex: 0, topic: 'radiation', points: 2 }] }, [source], 2);
+  assert.equal(valid[0].answer, 'Alpha radiation is stopped by paper');
+});
+
+test('AI batch grading validates every question id and point limit', () => {
+  const items = [{ id: 'q1', points: 4 }, { id: 'q2', points: 2 }];
+  const grades = validateGrades({ grades: [
+    { id: 'q1', points: 3, confidence: .8, explanation: 'Partial.', missing: ['lead'] },
+    { id: 'q2', points: 2, confidence: .9, explanation: 'Complete.', missing: [] }
+  ] }, items);
+  assert.equal(grades.q1.points, 3);
+  assert.equal(grades.q2.points, 2);
+  assert.throws(() => validateGrades({ grades: [{ id: 'q1', points: 5, confidence: .8, explanation: 'x', missing: [] }] }, items), /Schema/);
+  assert.throws(() => validateGrades({ grades: [{ id: 'unknown', points: 1, confidence: .8, explanation: 'x', missing: [] }] }, items), /unbekannt/);
 });

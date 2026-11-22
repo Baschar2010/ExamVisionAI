@@ -8,7 +8,7 @@
     "build": "tsc -b && vite build",
     "preview": "vite preview --host 0.0.0.0",
     "typecheck": "tsc --noEmit",
-    "test": "node --experimental-strip-types --test src/core.test.ts src/analytics.test.ts src/pdf-layout.test.ts"
+    "test": "node --experimental-strip-types --test src/core.test.ts src/analytics.test.ts src/pdf-layout.test.ts src/timer.test.ts src/profile.test.ts src/grading.test.ts src/data-transfer.test.ts src/platform.test.ts src/i18n.test.ts"
   },
   "keywords": [],
   "author": "",
