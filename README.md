@@ -45,6 +45,7 @@ Der lokale Assistent beantwortet Gespräch und Allgemeinwissen aus einer kleinen
 - `npm run typecheck` und `npm run build`: erfolgreich.
 - Website im Chromium-Browser unter `http://localhost:5173` Ende-zu-Ende geprüft: 23 verschiedene Assistenten-Nachrichten mit allen sechs Modi, Materialbindung mit hochgeladenem PDF, alle Studio-Werkzeuge, alle geforderten PDF-Schaltflächen, A4/Seitenzahlen/Mehrseitigkeit/Tabellen/Grafik/Arabisch, Artefakt-Persistenz, Klassenarbeit, Abgabe, Musterlösung, Korrektur und Lernfortschritt. Keine ungefangenen Konsolenfehler.
 - Neue Debug-APK aus dem aktuellen Stand: `release/ExamVisionAI-1.1-debug.apk` (5.275.496 Bytes, SHA-256 `6970420785cf67ca0a6360fb84733ba19ef19316ce2c530279043edf4b82c4b6`). Paket `ai.examvision.app`, Version 1.1/Code 2, minSdk 24, targetSdk 36, gültig debug-signiert (v2). Der eingebettete Bundle-Hash entspricht `dist/assets/index-Di6tsRwy.js`.
+- Automatisch veröffentlichte APK: [Release v1.2.1](https://github.com/Baschar2010/ExamVisionAI/releases/tag/v1.2.1) mit `ExamVisionAI-v1.2.1-debug.apk` (5.169.783 Bytes, SHA-256 `78f7a5cd04f6cf7f89fcd3fa4bab4b32db322466b73f0777b1f767185c6298d5`), versionName 1.2.1/Code 4, debug-signiert. Nachweise in [TEST-REPORT.md](TEST-REPORT.md#7-automatische-github-release-veröffentlichung).
 - **Keine Installation oder Nutzung auf einem Android-Gerät/Emulator** durchgeführt; Details in [TEST-REPORT.md](TEST-REPORT.md).
 
 ## Website starten

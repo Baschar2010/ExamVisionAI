@@ -66,3 +66,15 @@ Zusätzlich blieb der bereits zuvor behobene Fehler behoben, dass der Dashboard-
 ## 6. Bewertung
 
 Die Website ist für die geprüften Arbeitsabläufe im Browser funktional verifiziert: Der Assistent unterscheidet alle sechs Modi korrekt, beantwortet Gespräch und Allgemeinwissen ohne Materialeinschränkung, bleibt bei Materialfragen, Erstellungen und Korrekturen strikt quellengebunden und bietet für alle geforderten Inhalte funktionierende PDF-Downloads. Die neue Debug-APK enthält nach Bundle-Hash-Vergleich exakt diesen Stand und ist statisch geprüft; ein Laufzeitverhalten auf Android wird bewusst nicht behauptet.
+
+## 7. Automatische GitHub-Release-Veröffentlichung
+
+- Workflow: `.github/workflows/android-release.yml`, Trigger `push` auf Tags `v*`, Rechte `contents: write`. Keine privaten Secrets, Tokens oder Schlüssel im Repository; der Lauf nutzt nur `github.token`.
+- Ablauf: Checkout, Node 24, JDK 21, Android-SDK-Prüfung, `npm ci`, `npm test` (57/57), `npm run build`, `npx cap sync android`, `chmod +x android/gradlew`, `./gradlew assembleDebug --no-daemon`, APK-Integritätsprüfung, Build-Artefakt, Release-Notizen, Release mit benannter APK.
+- Reale Läufe: `45190030476` (Tag `v1.2.0`) und `45190823252` (Tag `v1.2.1`) jeweils **erfolgreich**. Ein erneuter Lauf von `45190823252` bei bereits vorhandenem Release war ebenfalls erfolgreich; der Release-Schritt aktualisiert die APK per `gh release upload --clobber` statt abzubrechen.
+- Veröffentlichtes Release: https://github.com/Baschar2010/ExamVisionAI/releases/tag/v1.2.1 (nicht Draft, nicht Pre-Release), Titel `ExamVision AI v1.2.1 – Debug-APK`.
+- Download-Asset: `ExamVisionAI-v1.2.1-debug.apk`, 5.169.783 Bytes, `state: uploaded`, Inhaltstyp `application/vnd.android.package-archive`. Direkter Link: https://github.com/Baschar2010/ExamVisionAI/releases/download/v1.2.1/ExamVisionAI-v1.2.1-debug.apk
+- Heruntergeladene APK erneut geprüft: Datei-SHA-256 `78f7a5cd04f6cf7f89fcd3fa4bab4b32db322466b73f0777b1f767185c6298d5` (entspricht dem von GitHub gemeldeten Digest), `ai.examvision.app`, versionCode `4`, versionName `1.2.1`, minSdk `24`, targetSdk `36`, compileSdk `36`.
+- Signatur: **`Verifies`**, APK Signature Scheme v2, 1 Signer, `C=US, O=Android, CN=Android Debug`. Die APK ist ausdrücklich **nicht offiziell signiert**. Da GitHub-Runner bei jedem Lauf ein neues Debug-Zertifikat erzeugen können (hier wurden drei verschiedene Signer-Digests beobachtet), ist ein Update über eine bestehende Installation nicht garantiert; vorher exportieren, deinstallieren und importieren.
+- Eingebetteter Web-Bundle `assets/public/assets/index-Di6tsRwy.js` hat denselben SHA-256 wie `dist/assets/index-Di6tsRwy.js` (`dddf44c7539040d512ec1085f600caab844f7c140ac20567eebdc74fbd474538`).
+- Bekannte nicht blockierende Meldung: `actions/upload-artifact@v5` nutzt eine Node-20-Laufzeit, die vom Runner auf Node 24 umgestellt wird (Deprecation-Hinweis). Der Release-Pfad selbst ist davon nicht betroffen und mehrfach erfolgreich gelaufen.
