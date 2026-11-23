@@ -32,7 +32,7 @@ npm run preview
 
 ### Aktueller Download
 
-Die jeweils aktuelle, automatisch gebaute APK liegt unter [GitHub Releases](https://github.com/Baschar2010/ExamVisionAI/releases). Dort die Datei `ExamVisionAI-<Tag>-debug.apk` des gewünschten Releases herunterladen (z. B. `ExamVisionAI-v1.3.0-debug.apk`). Der Release-Titel und die Datei enthalten den Versionstag. Diese APK ist mit dem Android-Debug-Schlüssel signiert und ausdrücklich **nicht offiziell signiert**.
+Die jeweils aktuelle, automatisch gebaute APK liegt unter [GitHub Releases](https://github.com/Baschar2010/ExamVisionAI/releases). Die aktuelle Version ist [v1.3.0](https://github.com/Baschar2010/ExamVisionAI/releases/tag/v1.3.0) mit dem direkten Download [ExamVisionAI-v1.3.0-debug.apk](https://github.com/Baschar2010/ExamVisionAI/releases/download/v1.3.0/ExamVisionAI-v1.3.0-debug.apk) (5.318.679 Bytes, SHA-256 `5d074cfa810bdd5621c81e2b45feb01b2daebe9457418a30d22e620ddb22efbb`). Dort die Datei `ExamVisionAI-<Tag>-debug.apk` des gewünschten Releases herunterladen. Der Release-Titel und die Datei enthalten den Versionstag. Diese APK ist mit dem Android-Debug-Schlüssel signiert und ausdrücklich **nicht offiziell signiert**.
 
 Die Debug-Signatur der CI-APK unterscheidet sich von der lokal gebauten APK; GitHub-Runner können bei jedem Lauf ein neues Debug-Zertifikat erzeugen. Ein Update zwischen Builds mit unterschiedlichem Debug-Schlüssel kann daher scheitern; vorher Daten exportieren, die alte Version deinstallieren und danach die JSON-Datei importieren.
 

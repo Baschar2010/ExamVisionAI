@@ -106,12 +106,24 @@ Neue Unit-Tests:
 - `file_paths.xml`: `<files-path name="files" path="." />` für FileProvider-Zugriff auf `Directory.Data`.
 - `native-io.ts`: schreibt nach `Directory.Data/exports`, ruft `Filesystem.getUri` auf und übergibt ausschließlich `file://`-URIs an `Share.share({ files })`. Datei-Schreibfehler werden gemeldet; ein abgebrochener Teilen-Dialog führt zu `shared:false`, die Datei bleibt gespeichert.
 - `storage.ts`: liest localStorage, IndexedDB und die native `profile.json`, führt sie nach `savedAt` zusammen und schreibt alle drei Ziele. Die Autosave-Verzögerung beträgt 250 ms.
-- `main.tsx`: Android-Back-Listener mitside Navigation, globale Lade-/Erfolgsmeldungen, „Meine Arbeiten“ mit Suche/Filter/CRUD/Zuordnung/PDF-Buttons, `correctionDocId` an der Arbeit.
+- `main.tsx`: Android-Back-Listener mitsamt Navigation, globale Lade-/Erfolgsmeldungen, „Meine Arbeiten" mit Suche/Filter/CRUD/Zuordnung/PDF-Buttons, `correctionDocId` an der Arbeit, Bestätigungsdialoge für Dokument-, Artefakt- und Chat-Löschung.
 
 ### 8.3 Nicht verifiziert
 
-- Kein lokaler Gradle-Build in dieser Umgebung: `java` fehlt, `JAVA_HOME` und `ANDROID_HOME` sind nicht gesetzt. Der GitHub-Actions-Lauf ist die nächste Verifikationsinstanz.
+- Kein lokaler Gradle-Build in dieser Umgebung: `java` fehlt, `JAVA_HOME` und `ANDROID_HOME` sind nicht gesetzt. Die Verifikation erfolgte ausschließlich über den GitHub-Actions-Lauf (siehe Abschnitt 9).
 - Kein Android-Gerät und kein Emulator: Installation, FileProvider-Sharing, tatsächliches Öffnen/Speichern von PDFs, OCR, Timer-Ablauf, Back-Taste, Tastaturverhalten und Persistenz nach Neustart wurden **nicht** auf Gerät geprüft.
 - Keine visuelle Gerätetest-Matrix für alle Displaygrößen und das Querformat; die CSS-Regeln sind statisch geprüft.
 - Keine echten Nutzerdaten gelöscht; der Löschdialog wurde nicht mit produktiven Daten ausgeführt.
 - Der optionale KI-Connector bleibt ohne konfigurierten Live-Endpunkt und ist weiterhin nur durch Unit-Tests abgesichert.
+
+## 9. Release-Verifikation v1.3.0
+
+- Commit auf `main`: `c22acc8`, Tag `v1.3.0` (annotiert), Push am 23.11.2026.
+- GitHub-Actions-Lauf: `45207300656`, **erfolgreich** in 2 m 8 s. Alle Schritte grün: `npm ci`, `npm test` (64/64), `npm run build`, `npx cap sync android`, `assembleDebug`, APK-Prüfung, Artefakt-Upload und Release-Erstellung.
+- APK-Prüfung im Runner: Datei vorhanden, `unzip -t` intakt, `aapt dump badging` meldet `package: name='ai.examvision.app' versionCode='5' versionName='1.3.0'`, `compileSdkVersion='36'`.
+- Veröffentlichtes Release: https://github.com/Baschar2010/ExamVisionAI/releases/tag/v1.3.0 (nicht Draft, nicht Pre-Release), Titel `ExamVision AI v1.3.0 – Debug-APK`.
+- Download-Asset: `ExamVisionAI-v1.3.0-debug.apk`, **5.318.679 Bytes**, `state: uploaded`, Inhaltstyp `application/vnd.android.package-archive`. Direkter Link: https://github.com/Baschar2010/ExamVisionAI/releases/download/v1.3.0/ExamVisionAI-v1.3.0-debug.apk
+- Unabhängig heruntergeladen und lokal geprüft: SHA-256 `5d074cfa810bdd5621c81e2b45feb01b2daebe9457418a30d22e620ddb22efbb` – identisch mit dem von GitHub gemeldeten Digest.
+- Signatur: debug-signiert durch den Workflow (`assembleDebug`). Wie bei v1.2.1 kann sich das Debug-Zertifikat zwischen Runner-Läufen ändern; ein Update über eine bestehende Installation ist nicht garantiert. Vorher JSON exportieren, alte Version deinstallieren, JSON importieren.
+- Bekannte nicht blockierende Meldung: `actions/upload-artifact@v5` läuft auf Node 24 statt Node 20 (Deprecation-Hinweis); der Release-Pfad ist nicht betroffen.
+- **Weiterhin kein Gerätetest:** Installation, FileProvider-Sharing, PDF-Öffnen/Speichern, OCR, Persistenz, Tastatur, Back-Taste und beide Ausrichtungsmodi wurden nicht auf einem Android-Gerät oder Emulator geprüft.

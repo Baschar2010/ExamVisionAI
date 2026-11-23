@@ -125,4 +125,4 @@ Die Website ist für alle geforderten Lehr-/Lernabläufe einschließlich der sec
 
 ### Prüfstand
 
-`npm test`: 64/64 grün, `npm run typecheck` und `npm run build` erfolgreich, `npx cap sync android` erfolgreich. Ein lokaler Gradle-Build war nicht möglich (kein JDK und kein `ANDROID_HOME` in dieser Umgebung); der GitHub-Actions-Lauf baut und verifiziert die APK. Ein Gerätetest bleibt ausdrücklich offen.
+`npm test`: 64/64 grün, `npm run typecheck` und `npm run build` erfolgreich, `npx cap sync android` erfolgreich. Ein lokaler Gradle-Build war nicht möglich (kein JDK und kein `ANDROID_HOME` in dieser Umgebung); der GitHub-Actions-Lauf `45207300656` hat die APK erfolgreich gebaut und verifiziert. Veröffentlicht wurde [v1.3.0](https://github.com/Baschar2010/ExamVisionAI/releases/tag/v1.3.0) mit `ExamVisionAI-v1.3.0-debug.apk` (5.318.679 Bytes, SHA-256 `5d074cfa810bdd5621c81e2b45feb01b2daebe9457418a30d22e620ddb22efbb`). Ein Gerätetest bleibt ausdrücklich offen; Details in [TEST-REPORT.md](TEST-REPORT.md#9-release-verifikation-v130).
