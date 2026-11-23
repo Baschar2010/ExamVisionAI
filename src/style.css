@@ -197,6 +197,19 @@ textarea { resize: vertical; line-height: 1.5; }
 .studio-artifact span { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .studio-artifact i { display: grid; place-items: center; color: #aab2c3; font-style: normal; }
 .studio-artifact i:hover { color: var(--danger); }
+.itemmain { display: flex; align-items: center; gap: 12px; flex: 1; min-width: 0; border: 0; background: transparent; color: inherit; padding: 0; text-align: left; cursor: pointer; }
+.itemmain > span:nth-child(2) { flex: 1; min-width: 0; }
+.studio-artifact-main { display: flex; align-items: center; gap: 8px; flex: 1; min-width: 0; border: 0; background: transparent; color: inherit; padding: 0; font-size: 12px; text-align: left; cursor: pointer; }
+.studio-artifact-action { border: 0; background: transparent; color: #aab2c3; padding: 3px; border-radius: 6px; display: grid; place-items: center; cursor: pointer; }
+.studio-artifact-action:hover { background: var(--surface-soft); color: var(--ink); }
+.studio-artifact-action.danger:hover { background: #fef2f2; color: var(--danger); }
+.intentchip { display: inline-flex; margin-left: 8px; padding: 2px 8px; border-radius: 999px; background: var(--violet-soft); color: var(--violet-dark); font-size: 10px; font-weight: 700; }
+.intentchip.intent-conversation { background: #dcfce7; color: #15803d; }
+.intentchip.intent-generalKnowledge { background: #dbeafe; color: #1d4ed8; }
+.intentchip.intent-materialQuestion { background: var(--violet-soft); color: var(--violet-dark); }
+.intentchip.intent-examCreation { background: #ffedd5; color: #c2410c; }
+.intentchip.intent-practiceTasks { background: #ccfbf1; color: #0f766e; }
+.intentchip.intent-correction { background: #fae8ff; color: #a21caf; }
 .studio-work { min-width: 0; }
 .studio-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 15px; margin-bottom: 20px; }
 .studio-head h1 { margin-bottom: 5px; font-size: 29px; }

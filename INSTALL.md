@@ -38,12 +38,13 @@ npm run preview
 | Paket | `ai.examvision.app` |
 | Version | 1.1 (versionCode 2) |
 | minSdk / targetSdk | 24 (Android 7.0) / 36 |
-| Größe | 5.275.495 Bytes |
-| Datei-SHA-256 | `323f6089cfaf346f9d312e652901f1c0e5ca9fba966dfbb4dca822872c1385a4` |
+| Größe | 5.275.496 Bytes |
+| Datei-SHA-256 | `6970420785cf67ca0a6360fb84733ba19ef19316ce2c530279043edf4b82c4b6` |
 | Signer | `C=US, O=Android, CN=Android Debug` |
 | Signer-SHA-256 | `5cb13602e7a003d61c9739842f74e32d869fe84ae8f7b68f1b2ecc42ac1947cd` |
+| Signaturschema | APK Signature Scheme v2 gültig |
 
-Der Roh-Build liegt unter `android/app/build/outputs/apk/debug/app-debug.apk`. Das Verzeichnis `release/` ist im Git ignorierte Ablage für das fertige Artefakt.
+Der Roh-Build liegt unter `android/app/build/outputs/apk/debug/app-debug.apk`. Das Verzeichnis `release/` ist im Git ignorierte Ablage für das fertige Artefakt. Der eingebettete Web-Bundle `assets/public/assets/index-Di6tsRwy.js` hat denselben SHA-256 wie `dist/assets/index-Di6tsRwy.js` (`dddf44c7539040d512ec1085f600caab844f7c140ac20567eebdc74fbd474538`).
 
 ### Schritte
 
@@ -53,7 +54,7 @@ Der Roh-Build liegt unter `android/app/build/outputs/apk/debug/app-debug.apk`. D
 4. Installationsdialog bestätigen. Eine Warnung von Play Protect ist bei debug-signierten APKs möglich und muss bewusst bestätigt werden.
 5. App öffnen und zuerst die gewünschte Sprache unter **Einstellungen → Sprache** prüfen.
 
-Diese Schritte beschreiben den üblichen Android-Weg. **Die Installation und der Start wurden in diesem Projekt nicht auf einem echten Gerät oder Emulator ausgeführt**, weil keines verfügbar war; siehe [TEST-REPORT.md](TEST-REPORT.md#4-nicht-durchgeführt--nicht-verifiziert).
+Diese Schritte beschreiben den üblichen Android-Weg. **Die Installation und der Start wurden in diesem Projekt nicht auf einem echten Gerät oder Emulator ausgeführt**, weil keines verfügbar war; siehe [TEST-REPORT.md](TEST-REPORT.md#4-android-status).
 
 ### Hinweise zur Debug-Signatur
 

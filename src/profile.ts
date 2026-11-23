@@ -1,4 +1,5 @@
 import type { Profile } from './types.ts';
+import { ASSISTANT_INTENTS, type AssistantIntent } from './assistant-router.ts';
 
 export const PROFILE_KEY = 'examvision-profile';
 
@@ -32,7 +33,17 @@ export function normalizeProfile(value: unknown): Profile {
     docs: array(raw.docs).filter(doc => doc && typeof doc.id === 'string' && typeof doc.text === 'string'),
     exams: array(raw.exams).filter(exam => exam && typeof exam.id === 'string' && Array.isArray(exam.questions)),
     artifacts: array(raw.artifacts).filter(item => item && typeof item.id === 'string' && typeof item.kind === 'string' && item.data && typeof item.data === 'object'),
-    chat: array(raw.chat).filter(item => item && typeof item.id === 'string' && typeof item.question === 'string' && typeof item.answer === 'string'),
+    chat: array(raw.chat)
+      .filter(item => item && typeof item.id === 'string' && typeof item.question === 'string' && typeof item.answer === 'string')
+      .map(item => ({
+        id: item.id,
+        question: item.question,
+        answer: item.answer,
+        sources: array(item.sources).filter(source => typeof source === 'string'),
+        created: typeof item.created === 'string' ? item.created : new Date().toISOString(),
+        mode: item.mode === 'ai' ? 'ai' : 'local',
+        ...(ASSISTANT_INTENTS.includes(item.intent) ? { intent: item.intent as AssistantIntent } : {})
+      })),
     lang,
     ocrLang: typeof raw.ocrLang === 'string' && raw.ocrLang.length ? raw.ocrLang : 'deu',
     scale: scale.length === 5 ? scale : [...emptyProfile.scale],

@@ -33,3 +33,15 @@ test('normalizeProfile tolerates an empty or corrupt fallback', () => {
   assert.deepEqual(normalizeProfile(null), emptyProfile);
   assert.equal(normalizeProfile({ lang: 'xx' }).lang, 'de');
 });
+
+test('normalizeProfile keeps the assistant intent and still reads old chat data', () => {
+  const profile = normalizeProfile({
+    chat: [
+      { id: 'c1', question: 'Hallo', answer: 'Hallo!', sources: [], created: '2026-01-01', mode: 'local', intent: 'conversation' },
+      { id: 'c2', question: 'Frage?', answer: 'Antwort', sources: [], created: '2026-01-02', mode: 'local' }
+    ]
+  });
+  assert.equal(profile.chat[0].intent, 'conversation');
+  assert.deepEqual(profile.chat[1].intent, undefined);
+  assert.equal(profile.chat[1].created, '2026-01-02');
+});

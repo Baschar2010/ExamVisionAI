@@ -1,5 +1,6 @@
 import type { ExamTimer } from './timer.ts';
 import type { TemplateProfile } from './core.ts';
+import type { AssistantIntent } from './assistant-router.ts';
 
 export type Doc = {
   id: string;
@@ -63,6 +64,7 @@ export type ChatTurn = {
   sources: string[];
   created: string;
   mode: 'local' | 'ai';
+  intent?: AssistantIntent;
 };
 
 export type Profile = {

@@ -8,7 +8,8 @@ import {
 } from 'lucide-react';
 import { evaluateAnswer, type Difficulty, type SourcePassage } from './core.ts';
 import { localFeedback } from './grading.ts';
-import { answerFromMaterials, suggestQuestions } from './assistant.ts';
+import { suggestQuestions } from './assistant.ts';
+import { intentLabel, routeAssistant, type AssistantRouterLabels } from './assistant-router.ts';
 import { buildLessonPlan, type LessonPlan } from './lesson.ts';
 import { buildWorksheet, type Worksheet } from './worksheet.ts';
 import { buildPresentation, type Presentation as PresentationModel } from './presentation.ts';
@@ -38,9 +39,10 @@ type DashboardProps = {
   onStudio: (tool: StudioTool) => void;
   onAsk: (question: string) => void;
   onOpenArtifact: (artifact: Artifact) => void;
+  onExportArtifact: (artifact: Artifact) => void;
 };
 
-export function Dashboard({ p, t, learning, onNavigate, onStudio, onAsk, onOpenArtifact }: DashboardProps) {
+export function Dashboard({ p, t, learning, onNavigate, onStudio, onAsk, onOpenArtifact, onExportArtifact }: DashboardProps) {
   const [query, setQuery] = useState('');
   const artifacts = useMemo(() => p.artifacts.slice().sort((a, b) => b.created.localeCompare(a.created)).slice(0, 4), [p.artifacts]);
   const materials = useMemo(() => p.docs.filter(doc => doc.role === 'material').slice(0, 4), [p.docs]);
@@ -131,11 +133,14 @@ export function Dashboard({ p, t, learning, onNavigate, onStudio, onAsk, onOpenA
       <section className="section panel">
         <div className="sectionhead"><h2>{t.recentContent}</h2><button className="textbtn" onClick={() => onStudio('assistant')}>{t.allTools}</button></div>
         {artifacts.length === 0 ? <div className="miniempty"><Sparkles /> {t.noArtifacts}</div> :
-          <div className="itemlist">{artifacts.map(a => <button className="itemrow" key={a.id} onClick={() => onOpenArtifact(a)}>
-            <span className="itemicon violet">{React.createElement(TOOL_ICONS[a.kind], { size: 18 })}</span>
-            <span><b>{a.title}</b><small>{artifactLabel[a.kind]} · {new Date(a.created).toLocaleDateString()}</small></span>
+          <div className="itemlist">{artifacts.map(a => <div className="itemrow" key={a.id}>
+            <button className="itemmain" onClick={() => onOpenArtifact(a)}>
+              <span className="itemicon violet">{React.createElement(TOOL_ICONS[a.kind], { size: 18 })}</span>
+              <span><b>{a.title}</b><small>{artifactLabel[a.kind]} · {new Date(a.created).toLocaleDateString()}</small></span>
+            </button>
+            <button className="iconbtn" title={t.pdfDownload} aria-label={t.pdfDownload} onClick={() => onExportArtifact(a)}><ArrowDownToLine size={16} /></button>
             <ChevronRight size={16} />
-          </button>)}</div>}
+          </div>)}</div>}
       </section>
 
       <section className="section panel">
@@ -204,17 +209,9 @@ export type StudioProps = {
   onDeleteArtifact: (id: string) => void;
   onExamFromQuestions: (questions: Q[]) => void;
   onExportPdf: (blocks: PdfBlock[], filename: string) => void;
+  onExportArtifact: (artifact: Artifact) => void;
   onError: (message: string) => void;
 };
-
-function textBlocks(lines: Array<{ text: string; x?: number; size?: number; gapAfter?: number }>): PdfBlock[] {
-  return lines.map(line => {
-    const x = line.x ?? 18;
-    const size = line.size ?? 11;
-    const wrapped = wrapText(line.text, Math.max(20, Math.floor((190 - x) / (size * .52))));
-    return { lines: wrapped.map(text => ({ text, x, size, rtl: isRtlText(text), height: size * .48 + 1.6 })), gapAfter: line.gapAfter ?? 2 };
-  });
-}
 
 function esc(value: unknown): string {
   return String(value ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
@@ -322,7 +319,7 @@ export function Studio(props: StudioProps) {
   const {
     p, t, tool, initialArtifact, selected, setSelected, workPassages, allPassages, topics,
     busy, progress, onUpload, onRemoveDoc, onAsk, onClearChat, onSaveArtifact,
-    onDeleteArtifact, onExamFromQuestions, onExportPdf, onError
+    onDeleteArtifact, onExamFromQuestions, onExportPdf, onExportArtifact, onError
   } = props;
 
   const [active, setActive] = useState<StudioTool>(tool);
@@ -517,63 +514,12 @@ export function Studio(props: StudioProps) {
     save('graphic', `${result.title}${topic ? `: ${topic}` : ''}`, result);
   }
 
-  function exportLessonPdf() {
-    if (!lesson) return;
-    const lines: Array<{ text: string; size?: number; gapAfter?: number }> = [
-      { text: lesson.title, size: 18, gapAfter: 8 },
-      ...lesson.meta.map(item => ({ text: `${item.label}: ${item.value}`, size: 10 })),
-      { text: t.objectives, size: 13, gapAfter: 3 },
-      ...lesson.objectives.map(item => ({ text: `• ${item}`, size: 10 })),
-      { text: t.phases, size: 13, gapAfter: 3 }
-    ];
-    for (const phase of lesson.phases) {
-      lines.push({ text: `${phase.name} · ${phase.minutes} ${t.minutesShort}`, size: 11, gapAfter: 2 });
-      lines.push({ text: phase.activity, size: 9 });
-      lines.push({ text: phase.teacher, size: 9 });
-      lines.push({ text: phase.students, size: 9 });
-      lines.push({ text: `${t.materials}: ${phase.material}`, size: 9, gapAfter: 5 });
-    }
-    lines.push({ text: `${t.differentiation}: ${lesson.differentiation}`, size: 10 });
-    lines.push({ text: `${t.assessment}: ${lesson.assessment}`, size: 10 });
-    lines.push({ text: `${t.sources}: ${lesson.sources.join(', ')}`, size: 10 });
-    onExportPdf(textBlocks(lines), `${safeFilename(lesson.title)}.pdf`);
-  }
-
-  function exportSheetPdf(result: Worksheet) {
-    const lines: Array<{ text: string; size?: number; gapAfter?: number }> = [
-      { text: result.title, size: 18, gapAfter: 6 },
-      { text: result.instructions, size: 10, gapAfter: 10 }
-    ];
-    result.questions.forEach((question, index) => {
-      lines.push({ text: `${index + 1}. ${question.prompt} (${question.points})`, size: 11, gapAfter: 3 });
-      lines.push({ text: `${t.source}: ${question.source}`, size: 8, gapAfter: 5 });
-      if (result.showSolutions) lines.push({ text: `${t.solution}: ${question.answer}`, size: 9, gapAfter: 6 });
-    });
-    onExportPdf(textBlocks(lines), `${safeFilename(result.title)}.pdf`);
-  }
-
-  function exportDeckPdf() {
-    if (!deck) return;
-    const lines: Array<{ text: string; size?: number; gapAfter?: number }> = [{ text: deck.title, size: 18, gapAfter: 8 }];
-    deck.slides.forEach((item, index) => {
-      lines.push({ text: `${t.slide} ${index + 1}: ${item.title}`, size: 13, gapAfter: 3 });
-      item.bullets.forEach(bullet => lines.push({ text: `• ${bullet}`, size: 10 }));
-      if (item.note) lines.push({ text: `${t.slideNotes}: ${item.note}`, size: 9, gapAfter: 5 });
-    });
-    onExportPdf(textBlocks(lines), `${safeFilename(deck.title)}.pdf`);
-  }
-
-  function exportGraphicPdf() {
-    if (!graphic) return;
-    const lines: Array<{ text: string; size?: number; gapAfter?: number }> = [
-      { text: graphic.title, size: 18, gapAfter: 4 },
-      { text: graphic.subtitle, size: 11, gapAfter: 8 }
-    ];
-    graphic.items.forEach(item => lines.push({
-      text: `${item.label}: ${item.value !== undefined ? item.value : item.text || ''}${item.detail ? ` · ${item.detail}` : ''}`,
-      size: 10
-    }));
-    onExportPdf(textBlocks(lines), `${safeFilename(graphic.title)}.pdf`);
+  function exportCurrent(kind: ArtifactKind, title: string, data: unknown) {
+    const artifact: Artifact = {
+      id: 'preview', kind, title, subject, topic,
+      created: new Date().toISOString(), lang, data
+    };
+    onExportArtifact(artifact);
   }
 
   async function exportGraphicPng() {
@@ -604,9 +550,16 @@ export function Studio(props: StudioProps) {
   }
 
   const art = artifactLines(p.artifacts);
-  const assistantLabels = {
+  const assistantLabels: AssistantRouterLabels = {
     noDocs: t.assistantNoDocs, noMatch: t.assistantNoMatch,
-    answerPrefix: t.assistantPrefix, sourcePrefix: t.sourcePrefix, suggestedPrefix: t.suggestions
+    answerPrefix: t.assistantPrefix, sourcePrefix: t.sourcePrefix, suggestedPrefix: t.suggestions,
+    modeConversation: t.modeConversation, modeGeneral: t.modeGeneral, modeMaterial: t.modeMaterial,
+    modeExam: t.modeExam, modePractice: t.modePractice, modeCorrection: t.modeCorrection,
+    chatHello: t.chatHello, chatMorning: t.chatMorning, chatHowAreYou: t.chatHowAreYou,
+    chatThanks: t.chatThanks, chatBye: t.chatBye, chatWho: t.chatWho, chatHelp: t.chatHelp,
+    chatCapabilities: t.chatCapabilities, generalPrefix: t.generalPrefix, generalFallback: t.generalFallback,
+    guideMaterial: t.guideMaterial, guideExam: t.guideExam, guidePractice: t.guidePractice,
+    guideCorrection: t.guideCorrection
   };
   const suggestions = suggestQuestions(allPassages, assistantLabels);
 
@@ -623,10 +576,13 @@ export function Studio(props: StudioProps) {
       </div>
       {art.length > 0 && <div className="studio-artifacts">
         <div className="navlabel">{t.recentContent}</div>
-        {art.map(a => <button key={a.id} className="studio-artifact" onClick={() => loadArtifact(a)}>
-          {React.createElement(TOOL_ICONS[a.kind], { size: 15 })}<span>{a.title}</span>
-          <i title={t.deleteArtifact} onClick={e => { e.stopPropagation(); onDeleteArtifact(a.id); }}><Trash2 size={14} /></i>
-        </button>)}
+        {art.map(a => <div key={a.id} className="studio-artifact">
+          <button className="studio-artifact-main" onClick={() => loadArtifact(a)}>
+            {React.createElement(TOOL_ICONS[a.kind], { size: 15 })}<span>{a.title}</span>
+          </button>
+          <button className="studio-artifact-action" title={t.pdfDownload} aria-label={t.pdfDownload} onClick={() => onExportArtifact(a)}><ArrowDownToLine size={14} /></button>
+          <button className="studio-artifact-action danger" title={t.deleteArtifact} aria-label={t.deleteArtifact} onClick={() => onDeleteArtifact(a.id)}><Trash2 size={14} /></button>
+        </div>)}
       </div>}
     </aside>
 
@@ -645,7 +601,9 @@ export function Studio(props: StudioProps) {
             {p.chat.length === 0 ? <div className="miniempty"><Bot /> {t.assistantEmpty}</div> : p.chat.map(turn =>
               <article className={`chatbubble ${turn.mode === 'ai' ? 'remote' : ''}`} key={turn.id}>
                 <span className="chatwho">{t.ask}</span><p>{turn.question}</p>
-                <div className="chatanswer"><span className="chatwho">{t.assistantLocal}</span><p>{turn.answer}</p>
+                <div className="chatanswer"><span className="chatwho">{t.assistantLocal}</span>
+                  {turn.intent && <span className={`intentchip intent-${turn.intent}`}>{intentLabel(turn.intent, assistantLabels)}</span>}
+                  <p>{turn.answer}</p>
                   {turn.sources.length > 0 && <small>{t.assistantSources}: {turn.sources.join(', ')}</small>}
                 </div>
               </article>)}
@@ -687,7 +645,7 @@ export function Studio(props: StudioProps) {
         </div>
         <div className="workcard previewcard">
           {lesson ? <>
-            <div className="previewhead"><h2>{lesson.title}</h2><button className="btn secondary" onClick={exportLessonPdf}><ArrowDownToLine size={16} /> PDF</button></div>
+            <div className="previewhead"><h2>{lesson.title}</h2><button className="btn secondary" onClick={() => exportCurrent('lesson', lesson.title, lesson)}><ArrowDownToLine size={16} /> {t.pdfDownload}</button></div>
             <div className="metarow">{lesson.meta.map(item => <span key={item.label}><b>{item.label}:</b> {item.value}</span>)}</div>
             <h3>{t.objectives}</h3><ul>{lesson.objectives.map((x, i) => <li key={i}>{x}</li>)}</ul>
             {lesson.phases.map((phase, i) => <article className="phase" key={i}>
@@ -715,7 +673,7 @@ export function Studio(props: StudioProps) {
         </div>
         <div className="workcard previewcard">
           {sheet ? <>
-            <div className="previewhead"><h2>{sheet.title}</h2><button className="btn secondary" onClick={() => exportSheetPdf(sheet)}><ArrowDownToLine size={16} /> {t.exportWorksheet}</button></div>
+            <div className="previewhead"><h2>{sheet.title}</h2><button className="btn secondary" onClick={() => exportCurrent('worksheet', sheet.title, sheet)}><ArrowDownToLine size={16} /> {t.pdfDownload}</button></div>
             <p className="muted">{sheet.instructions} · {sheet.showSolutions ? t.solutionsShown : t.solutionsHidden}</p>
             {sheet.questions.map((question, i) => <article className="sheetquestion" key={question.id}>
               <header><b>{i + 1}. {question.prompt}</b><span>{question.points}</span></header>
@@ -750,7 +708,7 @@ export function Studio(props: StudioProps) {
                 {result && result.points < question.points && <p><button className="textbtn" onClick={() => setResponses(x => ({ ...x, [question.id]: question.answer }))}>{t.revealSolution}</button></p>}
               </article>;
             })}
-            <button className="btn secondary wide" onClick={() => exportSheetPdf(practice)}><ArrowDownToLine size={16} /> {t.exportWorksheet}</button>
+            <button className="btn secondary wide" onClick={() => exportCurrent('practice', practice.title, practice)}><ArrowDownToLine size={16} /> {t.pdfDownload}</button>
           </> : <div className="miniempty"><Brain /> {t.practiceSub}</div>}
         </div>
       </div>}
@@ -771,7 +729,7 @@ export function Studio(props: StudioProps) {
         <div className="workcard previewcard">
           {deck ? <>
             <div className="previewhead"><h2>{t.slide} {slide + 1} / {deck.slides.length}</h2>
-              <button className="btn secondary" onClick={exportDeckPdf}><ArrowDownToLine size={16} /> {t.exportPresentation}</button></div>
+              <button className="btn secondary" onClick={() => exportCurrent('presentation', deck.title, deck)}><ArrowDownToLine size={16} /> {t.pdfDownload}</button></div>
             <article className="slidepreview">
               <span className="eyebrow">{deck.slides[slide].kind}</span>
               <h2>{deck.slides[slide].title}</h2>
@@ -801,7 +759,7 @@ export function Studio(props: StudioProps) {
             <div className="previewhead"><h2>{graphic.title}</h2><div className="btnrow">
               <button className="btn secondary" onClick={() => downloadBlob(new Blob([graphicSvg(graphic)], { type: 'image/svg+xml;charset=utf-8' }), `${safeFilename(graphic.title)}.svg`)}><Download size={16} /> {t.exportSvg}</button>
               <button className="btn secondary" onClick={() => void exportGraphicPng()}><ImageIcon size={16} /> {t.exportPng}</button>
-              <button className="btn secondary" onClick={exportGraphicPdf}><ArrowDownToLine size={16} /> PDF</button>
+              <button className="btn secondary" onClick={() => exportCurrent('graphic', graphic.title, graphic)}><ArrowDownToLine size={16} /> {t.pdfDownload}</button>
             </div></div>
             <div className="graphicframe" dangerouslySetInnerHTML={{ __html: graphicSvg(graphic) }} />
           </> : <div className="miniempty"><Network /> {t.graphicsSub}</div>}

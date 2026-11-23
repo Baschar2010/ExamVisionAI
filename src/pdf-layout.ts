@@ -1,6 +1,19 @@
 export type PdfExamQuestion = { prompt: string; answer: string; points: number; response?: string; earned?: number; topic?: string };
 export type PdfExam = { title: string; created: string; questions: PdfExamQuestion[] };
-export type PdfLine = { text: string; x: number; size: number; rtl: boolean; height: number; y?: number };
+export type PdfImage = { src: string; width: number; height: number; format?: 'PNG' | 'JPEG'; alt?: string };
+export type PdfTableCell = { lines: string[]; width: number; rtl: boolean };
+export type PdfLine = {
+  text: string;
+  x: number;
+  size: number;
+  rtl: boolean;
+  height: number;
+  y?: number;
+  image?: PdfImage;
+  cells?: PdfTableCell[];
+  header?: boolean;
+  tableId?: string;
+};
 export type PdfBlock = { lines: PdfLine[]; gapAfter: number };
 
 export function isRtlText(s: string): boolean {
@@ -29,6 +42,65 @@ export function wrapText(text: string, maxChars: number): string[] {
     if (line) result.push(line);
   }
   return result.length ? result : [''];
+}
+
+export function textBlocks(lines: Array<{ text: string; x?: number; size?: number; gapAfter?: number }>): PdfBlock[] {
+  return lines.map(item => {
+    const x = item.x ?? 18;
+    const size = item.size ?? 11;
+    const wrapped = wrapText(item.text, Math.max(20, Math.floor((190 - x) / (size * .52))));
+    return {
+      lines: wrapped.map(text => ({ text, x, size, rtl: isRtlText(text), height: size * .48 + 1.6 })),
+      gapAfter: item.gapAfter ?? 2
+    };
+  });
+}
+
+export function imageBlock(image: PdfImage, x = 18): PdfBlock {
+  return {
+    lines: [{ text: '', x, size: 10, rtl: false, height: image.height, image }],
+    gapAfter: 4
+  };
+}
+
+export function tableBlocks(
+  headers: string[],
+  rows: string[][],
+  options: { x?: number; widths?: number[]; size?: number; gapAfter?: number; id?: string } = {}
+): PdfBlock[] {
+  const tableId = options.id || `table-${headers.join('-').slice(0, 40)}`;
+  const x = options.x ?? 18;
+  const size = options.size ?? 9;
+  const totalWidth = 190 - x;
+  const widths = options.widths && options.widths.length === headers.length
+    ? options.widths
+    : headers.map(() => totalWidth / headers.length);
+  const lineHeight = size * .48 + 1.4;
+  const buildRow = (values: string[], header: boolean): PdfBlock => {
+    const cells = values.map((value, index) => {
+      const cellWidth = widths[index];
+      const maxChars = Math.max(6, Math.floor(cellWidth / (size * .52)) - 2);
+      return { lines: wrapText(value, maxChars).slice(0, 6), width: cellWidth, rtl: isRtlText(value) };
+    });
+    const count = Math.max(1, ...cells.map(cell => cell.lines.length));
+    return {
+      lines: [{
+        text: '',
+        x,
+        size,
+        rtl: false,
+        height: count * lineHeight + 2.6,
+        cells,
+        header,
+        tableId
+      }],
+      gapAfter: header ? 1 : 0
+    };
+  };
+  const blocks = [buildRow(headers, true)];
+  for (const row of rows) blocks.push(buildRow(row, false));
+  blocks[blocks.length - 1].gapAfter = options.gapAfter ?? 6;
+  return blocks;
 }
 
 function line(text: string, x: number, size: number, gapAfter = 0): PdfBlock {
@@ -102,10 +174,20 @@ export function paginateBlocks(blocks: PdfBlock[], options: { top?: number; bott
   const top = options.top ?? 22;
   const bottom = options.bottom ?? 280;
   const pages: PdfLine[][] = [[]];
+  const tableHeaders = new Map<string, PdfLine>();
   let y = top;
   for (const block of blocks) {
     for (const item of block.lines) {
-      if (y + item.height > bottom) { pages.push([]); y = top; }
+      if (item.header && item.tableId) tableHeaders.set(item.tableId, item);
+      if (y + item.height > bottom && y > top) {
+        pages.push([]);
+        y = top;
+        const header = !item.header && item.tableId && item.cells ? tableHeaders.get(item.tableId) : undefined;
+        if (header && y + header.height <= bottom) {
+          pages[pages.length - 1].push({ ...header, y });
+          y += header.height;
+        }
+      }
       pages[pages.length - 1].push({ ...item, y });
       y += item.height;
     }
