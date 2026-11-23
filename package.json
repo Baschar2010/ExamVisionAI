@@ -1,6 +1,6 @@
 {
   "name": "examvision-ai",
-  "version": "1.2.0",
+  "version": "1.2.1",
   "description": "Locally processed, source-grounded learning and exam app",
   "main": "index.js",
   "scripts": {
