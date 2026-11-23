@@ -179,4 +179,12 @@ Zusätzlich geprüft:
 
 ### 10.5 Release v1.4.0
 
-Der Tag `v1.4.0` und der GitHub-Actions-Lauf werden nach dem Commit geprüft; die verifizierten Angaben zu Release, APK-Größe und SHA-256 werden nach Abschluss des Laufs ergänzt.
+- Commit auf `main`: `e41f90f`, annotierter Tag `v1.4.0`, Push am 23.11.2026.
+- GitHub-Actions-Lauf: `45230647773`, **erfolgreich** in 1 m 36 s. Alle Schritte grün: `npm ci`, `npm test` (82/82), `npm run build`, `npx cap sync android`, `assembleDebug`, APK-Prüfung, Artefakt-Upload und Release-Erstellung.
+- Veröffentlichtes Release: https://github.com/Baschar2010/ExamVisionAI/releases/tag/v1.4.0 (nicht Draft, nicht Pre-Release), Titel `ExamVision AI v1.4.0 – Debug-APK`.
+- Download-Asset: `ExamVisionAI-v1.4.0-debug.apk`, **5.355.619 Bytes**, `state: uploaded`, Inhaltstyp `application/vnd.android.package-archive`. Direkter Link: https://github.com/Baschar2010/ExamVisionAI/releases/download/v1.4.0/ExamVisionAI-v1.4.0-debug.apk
+- Unabhängig heruntergeladen und lokal geprüft: SHA-256 `cb5b65f032885625c7f9d3f3324f6d96e1bb43d85b6fdd2f23e1f745bf04ab2e` – identisch mit dem von GitHub gemeldeten Digest.
+- Eingebetteter Web-Bundle `assets/public/assets/index-DK7Wc2H_.js` hat denselben SHA-256 wie `dist/assets/index-DK7Wc2H_.js` (`5882c00648d043305b7441a408f2c704e7acecd4c36bd48b97bd371f7ad1cd39`).
+- Die APK ist debug-signiert. Wie bei früheren Versionen kann sich das Debug-Zertifikat zwischen Runner-Läufen ändern; ein Update über eine bestehende Installation ist nicht garantiert. Vorher JSON exportieren, alte Version deinstallieren, JSON importieren.
+- Bekannte nicht blockierende Meldung: `actions/upload-artifact@v5` läuft auf Node 24 statt Node 20 (Deprecation-Hinweis); der Release-Pfad ist nicht betroffen.
+- **Weiterhin kein Gerätetest:** Installation, FileProvider-Sharing, PDF-Öffnen/Speichern, OCR, Persistenz, Tastatur, Back-Taste und beide Ausrichtungen wurden nicht auf einem Android-Gerät oder Emulator geprüft.
