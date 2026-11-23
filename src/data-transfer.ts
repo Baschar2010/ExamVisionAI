@@ -1,3 +1,4 @@
+import { saveTextFile, type SavedFile } from './native-io.ts';
 import { normalizeProfile } from './profile.ts';
 import type { Profile } from './types.ts';
 
@@ -20,14 +21,6 @@ export function parseProfile(text: string): Profile {
   return normalizeProfile(raw.profile);
 }
 
-export function downloadTextFile(filename: string, text: string, mime = 'application/json'): void {
-  const blob = new Blob([text], { type: `${mime};charset=utf-8` });
-  const url = URL.createObjectURL(blob);
-  const anchor = document.createElement('a');
-  anchor.href = url;
-  anchor.download = filename;
-  document.body.appendChild(anchor);
-  anchor.click();
-  anchor.remove();
-  setTimeout(() => URL.revokeObjectURL(url), 1000);
+export function downloadTextFile(filename: string, text: string, mime = 'application/json'): Promise<SavedFile> {
+  return saveTextFile(filename, text, mime);
 }

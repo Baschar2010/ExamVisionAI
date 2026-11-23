@@ -42,6 +42,8 @@ export type Exam = {
   duration: number;
   submitted?: boolean;
   timer?: ExamTimer;
+  solutionDocId?: string;
+  correctionDocId?: string;
 };
 
 export type ArtifactKind = 'lesson' | 'worksheet' | 'practice' | 'presentation' | 'graphic';

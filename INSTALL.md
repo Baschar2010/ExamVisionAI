@@ -32,7 +32,7 @@ npm run preview
 
 ### Aktueller Download
 
-Die jeweils aktuelle, automatisch gebaute APK liegt unter [GitHub Releases](https://github.com/Baschar2010/ExamVisionAI/releases). Dort die Datei `ExamVisionAI-<Tag>-debug.apk` des gewünschten Releases herunterladen (z. B. `ExamVisionAI-v1.2.1-debug.apk`). Der Release-Titel und die Datei enthalten den Versionstag. Diese APK ist mit dem Android-Debug-Schlüssel signiert und ausdrücklich **nicht offiziell signiert**.
+Die jeweils aktuelle, automatisch gebaute APK liegt unter [GitHub Releases](https://github.com/Baschar2010/ExamVisionAI/releases). Dort die Datei `ExamVisionAI-<Tag>-debug.apk` des gewünschten Releases herunterladen (z. B. `ExamVisionAI-v1.3.0-debug.apk`). Der Release-Titel und die Datei enthalten den Versionstag. Diese APK ist mit dem Android-Debug-Schlüssel signiert und ausdrücklich **nicht offiziell signiert**.
 
 Die Debug-Signatur der CI-APK unterscheidet sich von der lokal gebauten APK; GitHub-Runner können bei jedem Lauf ein neues Debug-Zertifikat erzeugen. Ein Update zwischen Builds mit unterschiedlichem Debug-Schlüssel kann daher scheitern; vorher Daten exportieren, die alte Version deinstallieren und danach die JSON-Datei importieren.
 
@@ -54,13 +54,21 @@ Der Roh-Build liegt unter `android/app/build/outputs/apk/debug/app-debug.apk`. D
 
 ### Schritte
 
-1. `ExamVisionAI-1.1-debug.apk` auf das Android-Gerät kopieren oder dort herunterladen.
+1. `ExamVisionAI-<Tag>-debug.apk` aus dem gewünschten Release auf das Android-Gerät kopieren oder dort herunterladen.
 2. Die APK in einem Dateimanager öffnen.
 3. Falls Android fragt, dem Dateimanager oder Browser einmalig das Installieren unbekannter Apps erlauben.
 4. Installationsdialog bestätigen. Eine Warnung von Play Protect ist bei debug-signierten APKs möglich und muss bewusst bestätigt werden.
 5. App öffnen und zuerst die gewünschte Sprache unter **Einstellungen → Sprache** prüfen.
 
 Diese Schritte beschreiben den üblichen Android-Weg. **Die Installation und der Start wurden in diesem Projekt nicht auf einem echten Gerät oder Emulator ausgeführt**, weil keines verfügbar war; siehe [TEST-REPORT.md](TEST-REPORT.md#4-android-status).
+
+### Nach dem Start (Android)
+
+- Arbeiten werden automatisch gespeichert und sind unter **Meine Arbeiten** mit Suche, Fachfilter, Öffnen, Bearbeiten, Umbenennen, Löschen und PDF-Exporten erreichbar.
+- PDFs, JSON-Sicherungen sowie SVG/PNG-Grafiken werden im app-privaten Verzeichnis `Directory.Data` gespeichert. Danach öffnet sich der Android-Dialog zum Teilen/Öffnen. Ohne Auswahl bleibt die Datei dort gespeichert.
+- Dateinamen enthalten Fach, Titel und deutsches Datum, z. B. `Mathematik_Klassenarbeit_23-11-2026.pdf`.
+- Die untere Navigation bietet große Touch-Ziele; **Mehr** enthält Übungen, Lernfortschritt und Einstellungen. Die Android-Zurück-Taste geht einen Schritt zurück und beendet die App nur auf der Startseite.
+- Bei Tastatur und Notch/Statusleiste werden `adjustResize` und Safe-Area-Abstände berücksichtigt.
 
 ### Hinweise zur Debug-Signatur
 
@@ -73,7 +81,7 @@ Die APK ist mit dem Android-Debug-Schlüssel signiert und für Tests gedacht, ni
 3. Auf dem Zielgerät: **Einstellungen → Daten importieren**, Datei auswählen und den Bestätigungsdialog lesen.
 4. Nach dem Import sind Dokumente, Artefakte, Chat, Arbeiten und Einstellungen aus der Datei wiederhergestellt. Der Import ersetzt die vorhandenen lokalen Daten vollständig.
 
-Die JSON-Datei enthält unter anderem Unterrichtsmaterialien, Arbeitsergebnisse, Chatverlauf, Prüfungen, Sprach- und Noteneinstellungen sowie optional den selbst konfigurierten KI-Endpunkt und Modellnamen. API-Schlüssel werden nicht in der App gespeichert und sind daher nicht enthalten. Behandle die Datei als vertraulich, da sie deine Unterrichtsinhalte enthält.
+Die JSON-Datei enthält unter anderem Unterrichtsmaterialien, Arbeitsergebnisse, Chatverlauf, Prüfungen, Sprach- und Noteneinstellungen sowie optional den selbst konfigurierten KI-Endpunkt und Modellnamen. API-Schlüssel werden nicht in der App gespeichert und sind daher nicht enthalten. Behandle die Datei als vertraulich, da sie deine Unterrichtsinhalte enthält. Beim normalen Start werden localStorage, IndexedDB und die native Sicherung nach `savedAt` zusammengeführt; dabei werden vorhandene Arbeiten und Dokumente nicht gelöscht.
 
 ## 4. Selbst bauen
 

@@ -100,3 +100,29 @@ Nicht verifiziert: Installation/Laufzeit auf Android (kein Gerät, kein Emulator
 ## 8. Fazit
 
 Die Website ist für alle geforderten Lehr-/Lernabläufe einschließlich der sechs Assistenten-Modi und des universellen PDF-Exports im Browser funktional geprüft. Die neue Android-Debug-APK enthält diesen Stand und wurde statisch verifiziert. Die Bedeutung der Lokalität, die Grenzen des Assistenten und das Fehlen einer Cloud-Synchronisierung werden in Oberfläche und Dokumentation ausdrücklich benannt. Eine Aussage über das Laufzeitverhalten auf einem Android-Gerät wird nicht getroffen.
+
+## 9. Reparaturrunde v1.3.0
+
+### Diagnose
+
+- `pdf.save()` und `<a download>` sind in der Android-WebView kein verlässlicher Weg, um Dateien dauerhaft abzulegen oder zu öffnen.
+- localStorage und IndexedDB lagen getrennt nebeneinander; ein Migrationsschritt konnte ältere Daten überschreiben.
+- Die alte `all`-Seite zeigte Arbeiten nur an, bot aber keine Verwaltung.
+- Safe Areas, Android-Zurück-Taste, Soft-Input-Modus und eine touchfreundliche untere Navigation fehlten.
+
+### Umgesetzte Änderungen
+
+| Bereich | Lösung |
+|---|---|
+| Persistenz | `src/storage.ts` liest und schreibt localStorage, IndexedDB und `Directory.Data/profile.json`. `src/profile-merge.ts` führt nach `savedAt` zusammen, vereinigt nach IDs und bewahrt nicht leere Felder. Autosave ist debounced (250 ms). |
+| Dateien | `src/native-io.ts` speichert Blobs/Text/Binärdaten base64-kodiert unter `Directory.Data/exports`, holt eine `file://`-URI und öffnet `Share.share({ files })`. Auf der Website bleibt der Browser-Download erhalten. |
+| Dateinamen | `src/file-naming.ts` erzeugt `Fach_Titel_TT-MM-JJJJ.pdf` sowie die Suffixe `Musterloesung` und `Korrektur`. |
+| Arbeiten | Neue Seite **Meine Arbeiten** mit Suche, Fachfilter, Öffnen, Bearbeiten, Umbenennen, Bestätigungsdialog beim Löschen, Datum/Fach/Status und Musterlösungs-/Korrektur-Zuordnung. Die Korrektur speichert `correctionDocId` direkt an der Arbeit. |
+| Mobile UI | Untere Navigation mit großen Zielen, „Mehr“-Menü, Safe-Area-Variablen, `viewport-fit=cover`, `interactive-widget=resizes-content`, `adjustResize`, 16px-Formularelemente und keine horizontalen Scrollbalken. |
+| Navigation | Explizite Historie mit Android-Back-Listener; die App verlässt nur auf der Startseite. |
+| Android | Offizielle Plugins `@capacitor/app`, `@capacitor/filesystem`, `@capacitor/share`; `cap sync` registriert sie, `file_paths.xml` erlaubt FileProvider-Zugriff auf `Directory.Data`. |
+| Version | `package.json`, `package-lock.json` und `android/app/build.gradle` auf 1.3.0 / versionCode 5. |
+
+### Prüfstand
+
+`npm test`: 64/64 grün, `npm run typecheck` und `npm run build` erfolgreich, `npx cap sync android` erfolgreich. Ein lokaler Gradle-Build war nicht möglich (kein JDK und kein `ANDROID_HOME` in dieser Umgebung); der GitHub-Actions-Lauf baut und verifiziert die APK. Ein Gerätetest bleibt ausdrücklich offen.

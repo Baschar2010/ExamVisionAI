@@ -6,7 +6,7 @@ ExamVision AI ist eine gemeinsame Codebasis für eine moderne PC-Website und ein
 
 ### Lernraum und Content-Studio
 
-- Helles responsives Design mit Sidebar, Dashboard, großen Arbeitsflächen und runden Karten in Violett/Blau.
+- Helles responsives Design mit Sidebar, Dashboard, großen Arbeitsflächen und runden Karten in Violett/Blau. Auf kleinen Displays: untere Navigation mit großen Touch-Zielen, „Mehr“-Menü, Safe-Area-Abstände, angepasste Tastatur im Hoch-/Querformat und kein horizontales Scrollen. Die Android-Zurück-Taste navigiert innerhalb der App und beendet sie nur auf der Startseite.
 - Dashboard mit Begrüßung, Suche/Assistent, Schnellzugriff, zuletzt erstellten Inhalten, gespeicherten Materialien, Lernfortschritt, letzten Arbeiten und persönlicher Statistik.
 - Content-Studio mit sieben echten Werkzeugen: **KI-Assistent**, **Unterricht planen**, **Arbeitsblätter**, **Übungsaufgaben**, **Präsentationen**, **Grafiken** und **Hochladen**.
 - Assistent mit sechs lokalen Modi: **Normales Gespräch**, **Allgemeinwissen**, **Materialfrage**, **Klassenarbeit**, **Übungsaufgaben** und **Korrektur**. Gespräch und allgemeine Fragen werden direkt beantwortet (offline-Wissensbasis); materialbezogene Anfragen, Erstellungen und Korrekturen bleiben strikt an hochgeladene Textstellen gebunden und nennen Quellen oder weisen auf fehlende Unterlagen hin. Jede Antwort zeigt den erkannten Modus als Chip. Kein simulatives generatives Modell und kein API-Schlüssel erforderlich.
@@ -15,7 +15,7 @@ ExamVision AI ist eine gemeinsame Codebasis für eine moderne PC-Website und ein
 - Präsentationen mit Folien, Erklärungen, Lehrerhinweisen und Quellen; PDF-Export.
 - Grafiken als Balkendiagramm, Zeitstrahl, Vergleich, Ablaufdiagramm und Infografik; Export als SVG, PNG und PDF.
 - Artefakte werden gespeichert, im Dashboard und in der Studio-Seitenleiste angezeigt, wieder geöffnet, als PDF heruntergeladen und gelöscht.
-- **Einheitlicher PDF-Export:** Für Unterrichtsentwürfe, Arbeitsblätter, Übungsaufgaben, Prüfungen, Musterlösungen, Korrekturen, Lernübersichten, Präsentationen, Grafiken und alle gespeicherten/zuletzt erstellten Inhalte steht die Schaltfläche **„Als PDF herunterladen“** bereit (bzw. „Musterlösung als PDF“ und „Korrektur als PDF“). Alle PDFs sind A4, mit lesbarer Schrift, Überschriften, Abständen, Tabellen, eingebetteten Grafiken, Seitenzahlen und umbrechenden Seiten; Arabisch wird RTL gerendert. Der Download läuft über den normalen Browser-/Geräte-Dialog und verändert die interaktive Ansicht nicht.
+- **Einheitlicher PDF-Export:** Für Unterrichtsentwürfe, Arbeitsblätter, Übungsaufgaben, Prüfungen, Musterlösungen, Korrekturen, Lernübersichten, Präsentationen, Grafiken und alle gespeicherten/zuletzt erstellten Inhalte steht die Schaltfläche **„Als PDF herunterladen“** bereit (bzw. „Musterlösung als PDF“ und „Korrektur als PDF“). Alle PDFs sind A4, mit lesbarer Schrift, Überschriften, Abständen, Tabellen, eingebetteten Grafiken, Seitenzahlen und umbrechenden Seiten; Arabisch wird RTL gerendert. Dateinamen folgen `Fach_Titel_TT-MM-JJJJ.pdf` mit den Suffixen `Musterloesung` und `Korrektur`. Auf Android wird die Datei app-privat gespeichert und anschließend der native Teilen-/Öffnen-Dialog geöffnet; im Browser läuft der gewohnte Download.
 
 ### Klassenarbeiten und Korrektur
 
@@ -25,13 +25,14 @@ ExamVision AI ist eine gemeinsame Codebasis für eine moderne PC-Website und ein
 - **Invariante:** Unterrichtsmaterialien liefern die erlaubten Themen und Antwortbelege. Die alte Arbeit liefert nur Schwierigkeitsgrad, Aufgabenarten, Struktur, Formulierungsstil und Punkte. Es werden keine Themen erfunden und keine alten Aufgaben übernommen.
 - Übungs-/Prüfungsmodus mit Timer, Pause/Fortsetzen, Aufgabenwechsel, Antwortspeicherung und Abgabe.
 - Korrektur mit Nummernzuordnung, Teilpunkten, Begründungen, Notenberechnung, Statistik und Wiederholungsthemen. Nicht sicher zuordenbare oder unleserliche Antworten werden **nicht** automatisch als richtig gewertet.
+- **Meine Arbeiten:** Alle gespeicherten Arbeiten mit Erstellungsdatum, Fach, Punktestand und Zuordnung von Musterlösung/Korrektur; Suche, Fachfilter, Öffnen, Bearbeiten, Umbenennen, Löschen mit Bestätigung sowie PDF-Exporte direkt aus der Liste.
 - Lernanalyse mit Themenprozenten, Durchschnitt, Trend und PDF-Bericht (**„Als PDF herunterladen“**).
 - Optionaler, standardmäßig deaktivierter KI-Connector für einen eigenen HTTPS-Endpunkt: Vorschau der übertragenen Auszüge, ausdrückliche Zustimmung pro Anfrage, Antwortvalidierung und lokaler Fallback. Keine API-Schlüssel in der App.
 
 ### Daten und Sprachen
 
 - Deutsch, Englisch, Arabisch (RTL), Französisch und Spanisch; OCR-Sprache separat einstellbar.
-- Speicherung ohne Konto in IndexedDB mit kleinem localStorage-Fallback; Löschen über Einstellungen.
+- **Automatische, dauerhafte Speicherung ohne Konto:** Änderungen werden nach 250 ms in localStorage und IndexedDB gesichert. Auf Android zusätzlich als `profile.json` im app-privaten Gerätespeicher (`Directory.Data`). Beim Start werden alle Quellen anhand ihres `savedAt` zusammengeführt; vorhandene Objekte werden nie stillschweigend gelöscht. Löschen erfolgt ausschließlich über den ausdrücklichen Bestätigungsdialog in den Einstellungen.
 - **Keine automatische Cloud-Synchronisierung.** Daten werden als JSON exportiert und auf dem anderen Gerät manuell importiert. Die App sagt das ausdrücklich in Dashboard und Einstellungen.
 - Installierbare Web-App/PWA und Capacitor-Android-Projekt aus derselben Quelle.
 
@@ -41,12 +42,12 @@ Der lokale Assistent beantwortet Gespräch und Allgemeinwissen aus einer kleinen
 
 ## Verifikation – kurz
 
-- `npm test`: **57/57** Tests bestanden (inkl. 23 Assistenten-Nachrichten und PDF-Bausteine).
-- `npm run typecheck` und `npm run build`: erfolgreich.
-- Website im Chromium-Browser unter `http://localhost:5173` Ende-zu-Ende geprüft: 23 verschiedene Assistenten-Nachrichten mit allen sechs Modi, Materialbindung mit hochgeladenem PDF, alle Studio-Werkzeuge, alle geforderten PDF-Schaltflächen, A4/Seitenzahlen/Mehrseitigkeit/Tabellen/Grafik/Arabisch, Artefakt-Persistenz, Klassenarbeit, Abgabe, Musterlösung, Korrektur und Lernfortschritt. Keine ungefangenen Konsolenfehler.
-- Neue Debug-APK aus dem aktuellen Stand: `release/ExamVisionAI-1.1-debug.apk` (5.275.496 Bytes, SHA-256 `6970420785cf67ca0a6360fb84733ba19ef19316ce2c530279043edf4b82c4b6`). Paket `ai.examvision.app`, Version 1.1/Code 2, minSdk 24, targetSdk 36, gültig debug-signiert (v2). Der eingebettete Bundle-Hash entspricht `dist/assets/index-Di6tsRwy.js`.
-- Automatisch veröffentlichte APK: [Release v1.2.1](https://github.com/Baschar2010/ExamVisionAI/releases/tag/v1.2.1) mit `ExamVisionAI-v1.2.1-debug.apk` (5.169.783 Bytes, SHA-256 `78f7a5cd04f6cf7f89fcd3fa4bab4b32db322466b73f0777b1f767185c6298d5`), versionName 1.2.1/Code 4, debug-signiert. Nachweise in [TEST-REPORT.md](TEST-REPORT.md#7-automatische-github-release-veröffentlichung).
-- **Keine Installation oder Nutzung auf einem Android-Gerät/Emulator** durchgeführt; Details in [TEST-REPORT.md](TEST-REPORT.md).
+- `npm test`: **64/64** Tests bestanden, davon neu: Dateinamen, `savedAt`-Migration und verlustfreies Zusammenführen mehrerer Speicherquellen.
+- `npm run typecheck` und `npm run build`: erfolgreich (2386 Module transformiert).
+- Frühere Browser-E2E unter `http://localhost:5173`: 23 Assistenten-Nachrichten mit allen sechs Modi, Materialbindung mit hochgeladenem PDF, alle Studio-Werkzeuge, alle geforderten PDF-Schaltflächen, A4/Seitenzahlen/Mehrseitigkeit/Tabellen/Grafik/Arabisch, Artefakt-Persistenz, Klassenarbeit, Abgabe, Musterlösung, Korrektur und Lernfortschritt. Keine ungefangenen Konsolenfehler.
+- Neu für v1.3.0 automatisiert geprüft: drei native Capacitor-Plugins im Android-Sync, `file_paths.xml` für `Directory.Data`, Soft-Input-Modus `adjustResize`, Safe-Area-Viewport und `savedAt`-Merge ohne Datenverlust.
+- Letzte verifizierte veröffentlichte APK: [Release v1.2.1](https://github.com/Baschar2010/ExamVisionAI/releases/tag/v1.2.1) mit `ExamVisionAI-v1.2.1-debug.apk` (5.169.783 Bytes, SHA-256 `78f7a5cd04f6cf7f89fcd3fa4bab4b32db322466b73f0777b1f767185c6298d5`), versionName 1.2.1/Code 4, debug-signiert. Nachweise in [TEST-REPORT.md](TEST-REPORT.md#7-automatische-github-release-veröffentlichung).
+- **Keine Installation oder Nutzung auf einem Android-Gerät/Emulator** durchgeführt; Datei-Sharing, OCR, Persistenz und Download-Verhalten auf Gerät sind nicht verifiziert. Details in [TEST-REPORT.md](TEST-REPORT.md).
 
 ## Website starten
 
@@ -78,7 +79,7 @@ cd android
 .\gradlew.bat assembleDebug --no-daemon
 ```
 
-Die APK liegt dann unter `android/app/build/outputs/apk/debug/app-debug.apk`. Eine lokal geprüfte Kopie des Standes 1.1 liegt unter `release/ExamVisionAI-1.1-debug.apk`. Aktuelle Download-APKs entstehen automatisch unter [GitHub Releases](https://github.com/Baschar2010/ExamVisionAI/releases). Für einen offiziell signierten Release einen eigenen Keystore verwenden und nie in Git committen; die automatisierten APKs sind ausdrücklich nur debug-signiert.
+Die APK liegt dann unter `android/app/build/outputs/apk/debug/app-debug.apk`. Aktuelle Download-APKs entstehen automatisch unter [GitHub Releases](https://github.com/Baschar2010/ExamVisionAI/releases). Für einen offiziell signierten Release einen eigenen Keystore verwenden und nie in Git committen; die automatisierten APKs sind ausdrücklich nur debug-signiert. PDFs und die native Datensicherung landen im app-privaten Verzeichnis `Directory.Data`; über den Teilen-Dialog können exportierte Dateien geöffnet oder gespeichert werden.
 
 ## Release veröffentlichen (GitHub Actions)
 
@@ -87,7 +88,7 @@ Ein Push eines Tags nach `v*` startet den Workflow `.github/workflows/android-re
 So veröffentlichst du eine neue Version:
 
 1. Änderungen committen und nach `main` pushen: `git push origin main`.
-2. Version anheben: `versionCode` und `versionName` in `android/app/build.gradle` sowie `version` in `package.json` und `package-lock.json` (z. B. `1.3.0`, `versionCode 4`). Erneut committen und pushen.
+2. Version anheben: `versionCode` und `versionName` in `android/app/build.gradle` sowie `version` in `package.json` und `package-lock.json` (z. B. `1.3.0`, `versionCode 5`). Erneut committen und pushen.
 3. Tag erstellen und pushen:
    ```bash
    git tag -a v1.3.0 -m "ExamVision AI 1.3.0"
@@ -99,7 +100,7 @@ Der Titel des Releases lautet `ExamVision AI <Tag> – Debug-APK`. In den Releas
 
 ## Datenschutz und Konfiguration
 
-Standardmäßig gibt es kein Backend, kein Konto, keine API-Schlüssel und keine automatische Synchronisierung. Dokumente, Artefakte, Chatverlauf, Antworten und Fortschritt liegen in IndexedDB des aktuellen Browser-Origin. Der optionale KI-Connector überträgt ausschließlich nach sichtbarer Vorschau und expliziter Zustimmung pro Anfrage an einen selbst konfigurierten HTTPS-Endpunkt; API-Schlüssel gehören auf diesen Server. Siehe [PRIVACY.md](PRIVACY.md) und [INSTALL.md](INSTALL.md).
+Standardmäßig gibt es kein Backend, kein Konto, keine API-Schlüssel und keine automatische Synchronisierung. Dokumente, Artefakte, Chatverlauf, Antworten und Fortschritt liegen lokal im Browser und auf Android zusätzlich als app-private Datei. Der optionale KI-Connector überträgt ausschließlich nach sichtbarer Vorschau und expliziter Zustimmung pro Anfrage an einen selbst konfigurierten HTTPS-Endpunkt; API-Schlüssel gehören auf diesen Server. Siehe [PRIVACY.md](PRIVACY.md) und [INSTALL.md](INSTALL.md).
 
 ## Lizenz
 

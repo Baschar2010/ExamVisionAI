@@ -1,6 +1,6 @@
 {
   "name": "examvision-ai",
-  "version": "1.2.1",
+  "version": "1.3.0",
   "description": "Locally processed, source-grounded learning and exam app",
   "main": "index.js",
   "scripts": {
@@ -8,7 +8,7 @@
     "build": "tsc -b && vite build",
     "preview": "vite preview --host 0.0.0.0",
     "typecheck": "tsc --noEmit",
-    "test": "node --experimental-strip-types --test src/core.test.ts src/analytics.test.ts src/pdf-layout.test.ts src/pdf-documents.test.ts src/timer.test.ts src/profile.test.ts src/grading.test.ts src/data-transfer.test.ts src/assistant-router.test.ts src/platform.test.ts src/i18n.test.ts"
+    "test": "node --experimental-strip-types --test src/core.test.ts src/analytics.test.ts src/pdf-layout.test.ts src/pdf-documents.test.ts src/timer.test.ts src/profile.test.ts src/grading.test.ts src/data-transfer.test.ts src/assistant-router.test.ts src/platform.test.ts src/i18n.test.ts src/file-naming.test.ts src/profile-merge.test.ts"
   },
   "keywords": [],
   "author": "",
@@ -16,7 +16,10 @@
   "type": "module",
   "dependencies": {
     "@capacitor/android": "^8.6.2",
+    "@capacitor/app": "^8.1.2",
     "@capacitor/core": "^8.6.2",
+    "@capacitor/filesystem": "^8.1.5",
+    "@capacitor/share": "^8.0.3",
     "idb-keyval": "^6.3.0",
     "jspdf": "^4.2.1",
     "lucide-react": "^1.77.0",

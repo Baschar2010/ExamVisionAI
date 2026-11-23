@@ -1,16 +1,17 @@
 # Testbericht
 
-Stand: 23.11.2026. Quellstand: sechs Modi des lokalen Assistenten und universeller PDF-Export für alle geeigneten erstellten Inhalte. Die Änderungen sind aktuell noch nicht committet.
+Stand: 23.11.2026. Quellstand: v1.3.0 – dauerhafte Speicherung, native PDF-/Datei-Ausgabe, „Meine Arbeiten“, mobile Navigation und Android-Konfiguration. Die Reparaturänderungen sind zum Zeitpunkt dieses Berichts noch nicht committet. Frühere Browser-E2E-Ergebnisse unten beziehen sich ausdrücklich auf den vorherigen Stand.
 
 ## 1. Automatische Prüfungen
 
 | Prüfung | Ergebnis |
 |---|---|
-| `npm test` | **57/57 bestanden**, 0 Fehler, 0 übersprungen |
+| `npm test` | **64/64 bestanden**, 0 Fehler, 0 übersprungen |
 | `npm run typecheck` | ohne Fehler |
-| `npm run build` | Vite-Build erfolgreich, **2371 Module** transformiert |
+| `npm run build` | Vite-Build erfolgreich, **2386 Module** transformiert |
+| `npx cap sync android` | erfolgreich; `app`, `filesystem` und `share` registriert |
 
-Getestete Module: `core`, `analytics`, `pdf-layout`, `pdf-documents`, `timer`, `profile`, `grading`, `data-transfer`, `assistant-router`, `platform`, `i18n`.
+Getestete Module: `core`, `analytics`, `pdf-layout`, `pdf-documents`, `timer`, `profile`, `grading`, `data-transfer`, `assistant-router`, `platform`, `i18n`, `file-naming`, `profile-merge`.
 
 Neu abgesichert sind insbesondere die Klassifikation von mindestens 20 verschiedenen Nachrichten in alle sechs Modi, die Anwendung der Materialbindung ausschließlich auf Material-, Prüfungs-, Übungs- und Korrekturfragen, die exakten Begrüßungs- und Wissensantworten, quellengebundene Antworten, ehrliche Fehlermeldungen bei fehlenden Unterlagen, die Rückwärtskompatibilität alter Chat-Daten sowie die gemeinsamen PDF-Bausteine für Tabellen, Bilder, Arabisch, Korrekturen und Lernübersichten.
 
@@ -43,7 +44,9 @@ Der erste Grafik-PDF-Export erzeugte eine 7.251.065 Bytes große Datei. Das Einb
 
 Zusätzlich blieb der bereits zuvor behobene Fehler behoben, dass der Dashboard-Navigationseintrag leer war: `navItem` akzeptiert jetzt ein explizites Label, sodass Dashboard und Studio korrekt beschriftet sind.
 
-## 4. Android-Status
+## 4. Android-Status (früherer Stand 1.1)
+
+> Die folgenden APK-Angaben stammen aus der vorherigen Reparaturrunde und gelten **nicht** für v1.3.0. Der aktuelle Stand ist in Abschnitt 8 beschrieben.
 
 - Für den aktuellen Quellstand wurde eine neue Debug-APK gebaut: `release/ExamVisionAI-1.1-debug.apk`, **5.275.496 Bytes**.
 - `npx cap sync android`: erfolgreich; aktuelles `dist` und `capacitor.config.json` wurden nach `android/app/src/main/assets` kopiert.
@@ -78,3 +81,37 @@ Die Website ist für die geprüften Arbeitsabläufe im Browser funktional verifi
 - Signatur: **`Verifies`**, APK Signature Scheme v2, 1 Signer, `C=US, O=Android, CN=Android Debug`. Die APK ist ausdrücklich **nicht offiziell signiert**. Da GitHub-Runner bei jedem Lauf ein neues Debug-Zertifikat erzeugen können (hier wurden drei verschiedene Signer-Digests beobachtet), ist ein Update über eine bestehende Installation nicht garantiert; vorher exportieren, deinstallieren und importieren.
 - Eingebetteter Web-Bundle `assets/public/assets/index-Di6tsRwy.js` hat denselben SHA-256 wie `dist/assets/index-Di6tsRwy.js` (`dddf44c7539040d512ec1085f600caab844f7c140ac20567eebdc74fbd474538`).
 - Bekannte nicht blockierende Meldung: `actions/upload-artifact@v5` nutzt eine Node-20-Laufzeit, die vom Runner auf Node 24 umgestellt wird (Deprecation-Hinweis). Der Release-Pfad selbst ist davon nicht betroffen und mehrfach erfolgreich gelaufen.
+
+## 8. Reparatur v1.3.0 – neue Prüfungen
+
+### 8.1 Automatisch
+
+| Prüfung | Ergebnis |
+|---|---|
+| `npm test` | **64/64 bestanden**, 0 Fehler, 0 übersprungen |
+| `npm run typecheck` | ohne Fehler |
+| `npm run build` | erfolgreich, **2386 Module** transformiert |
+| `npx cap sync android` | erfolgreich; `capacitor.plugins.json` enthält `App`, `Filesystem`, `Share` |
+| Android-Versionsstand | `android/app/build.gradle`: versionCode `5`, versionName `1.3.0`; `package.json` und `package-lock.json`: `1.3.0` |
+
+Neue Unit-Tests:
+- `src/file-naming.test.ts`: deutsche Sonderzeichen, Pfadtrenner, Datum `TT-MM-JJJJ`, Suffixe `Musterloesung`/`Korrektur`, Artefakt-Dateinamen.
+- `src/profile-merge.test.ts`: Zusammenführung mehrerer Quellen nach `savedAt`, Erhalt alter Dokumente, Vorrang neuer Inhalte bei gleicher ID bei gleichzeitigem Erhalt nicht leerer Fragen, Lesbarkeit des neuen Save-Envelopes und alter Profile.
+
+### 8.2 Statische Android-Prüfung
+
+- `index.html`: `viewport-fit=cover` und `interactive-widget=resizes-content`.
+- `src/style.css`: Safe-Area-Variablen, untere Navigation mit 48px-Touchzielen und Safe-Area-Padding, 16px-Formularelemente, HDPI-/Querformat-Anpassung, `overflow-x: hidden`.
+- `AndroidManifest.xml`: `android:windowSoftInputMode="adjustResize"`.
+- `file_paths.xml`: `<files-path name="files" path="." />` für FileProvider-Zugriff auf `Directory.Data`.
+- `native-io.ts`: schreibt nach `Directory.Data/exports`, ruft `Filesystem.getUri` auf und übergibt ausschließlich `file://`-URIs an `Share.share({ files })`. Datei-Schreibfehler werden gemeldet; ein abgebrochener Teilen-Dialog führt zu `shared:false`, die Datei bleibt gespeichert.
+- `storage.ts`: liest localStorage, IndexedDB und die native `profile.json`, führt sie nach `savedAt` zusammen und schreibt alle drei Ziele. Die Autosave-Verzögerung beträgt 250 ms.
+- `main.tsx`: Android-Back-Listener mitside Navigation, globale Lade-/Erfolgsmeldungen, „Meine Arbeiten“ mit Suche/Filter/CRUD/Zuordnung/PDF-Buttons, `correctionDocId` an der Arbeit.
+
+### 8.3 Nicht verifiziert
+
+- Kein lokaler Gradle-Build in dieser Umgebung: `java` fehlt, `JAVA_HOME` und `ANDROID_HOME` sind nicht gesetzt. Der GitHub-Actions-Lauf ist die nächste Verifikationsinstanz.
+- Kein Android-Gerät und kein Emulator: Installation, FileProvider-Sharing, tatsächliches Öffnen/Speichern von PDFs, OCR, Timer-Ablauf, Back-Taste, Tastaturverhalten und Persistenz nach Neustart wurden **nicht** auf Gerät geprüft.
+- Keine visuelle Gerätetest-Matrix für alle Displaygrößen und das Querformat; die CSS-Regeln sind statisch geprüft.
+- Keine echten Nutzerdaten gelöscht; der Löschdialog wurde nicht mit produktiven Daten ausgeführt.
+- Der optionale KI-Connector bleibt ohne konfigurierten Live-Endpunkt und ist weiterhin nur durch Unit-Tests abgesichert.

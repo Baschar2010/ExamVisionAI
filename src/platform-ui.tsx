@@ -15,6 +15,8 @@ import { buildWorksheet, type Worksheet } from './worksheet.ts';
 import { buildPresentation, type Presentation as PresentationModel } from './presentation.ts';
 import { buildGraphic, type GraphicModel, type GraphicType } from './graphics.ts';
 import { isRtlText, wrapText, type PdfBlock } from './pdf-layout.ts';
+import { safeFilename } from './file-naming.ts';
+import { saveBlobFile } from './native-io.ts';
 import type { Artifact, ArtifactKind, ChatTurn, Doc, Profile, Q } from './types.ts';
 
 type T = Record<string, any>;
@@ -300,19 +302,8 @@ export function graphicSvg(model: GraphicModel): string {
   </svg>`;
 }
 
-function downloadBlob(blob: Blob, filename: string) {
-  const url = URL.createObjectURL(blob);
-  const anchor = document.createElement('a');
-  anchor.href = url;
-  anchor.download = filename;
-  document.body.appendChild(anchor);
-  anchor.click();
-  anchor.remove();
-  setTimeout(() => URL.revokeObjectURL(url), 1000);
-}
-
-function safeFilename(value: string): string {
-  return String(value).replace(/[^\p{L}\p{N} -]/gu, '_').slice(0, 100) || 'ExamVision-AI';
+function downloadBlob(blob: Blob, filename: string, dialogTitle = 'Datei teilen oder öffnen') {
+  void saveBlobFile(blob, filename, { dialogTitle });
 }
 
 export function Studio(props: StudioProps) {
@@ -541,7 +532,7 @@ export function Studio(props: StudioProps) {
       ctx.scale(2, 2);
       ctx.drawImage(image, 0, 0);
       const blob = await new Promise<Blob | null>(resolve => canvas.toBlob(resolve, 'image/png'));
-      if (blob) downloadBlob(blob, `${safeFilename(graphic.title)}.png`);
+      if (blob) downloadBlob(blob, `${safeFilename(graphic.title)}.png`, t.shareFile);
     } catch (error) {
       onError(error instanceof Error ? error.message : String(error));
     } finally {
@@ -757,7 +748,7 @@ export function Studio(props: StudioProps) {
         <div className="workcard previewcard">
           {graphic ? <>
             <div className="previewhead"><h2>{graphic.title}</h2><div className="btnrow">
-              <button className="btn secondary" onClick={() => downloadBlob(new Blob([graphicSvg(graphic)], { type: 'image/svg+xml;charset=utf-8' }), `${safeFilename(graphic.title)}.svg`)}><Download size={16} /> {t.exportSvg}</button>
+              <button className="btn secondary" onClick={() => downloadBlob(new Blob([graphicSvg(graphic)], { type: 'image/svg+xml;charset=utf-8' }), `${safeFilename(graphic.title)}.svg`, t.shareFile)}><Download size={16} /> {t.exportSvg}</button>
               <button className="btn secondary" onClick={() => void exportGraphicPng()}><ImageIcon size={16} /> {t.exportPng}</button>
               <button className="btn secondary" onClick={() => exportCurrent('graphic', graphic.title, graphic)}><ArrowDownToLine size={16} /> {t.pdfDownload}</button>
             </div></div>
