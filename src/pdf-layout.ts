@@ -1,5 +1,30 @@
-export type PdfExamQuestion = { prompt: string; answer: string; points: number; response?: string; earned?: number; topic?: string };
-export type PdfExam = { title: string; created: string; questions: PdfExamQuestion[] };
+export type PdfExamQuestion = {
+  prompt: string;
+  answer: string;
+  points: number;
+  response?: string;
+  earned?: number;
+  topic?: string;
+  format?: string;
+  options?: string[];
+  correctIndex?: number;
+  operator?: string;
+  requirementLevel?: string;
+  source?: string;
+};
+export type PdfExam = {
+  title: string;
+  created: string;
+  questions: PdfExamQuestion[];
+  subject?: string;
+  gradeLevel?: string;
+  goal?: string;
+  objectives?: string[];
+  headerName?: string;
+  headerClass?: string;
+  headerDate?: string;
+  gradingScale?: string;
+};
 export type PdfImage = { src: string; width: number; height: number; format?: 'PNG' | 'JPEG'; alt?: string };
 export type PdfTableCell = { lines: string[]; width: number; rtl: boolean };
 export type PdfLine = {
@@ -111,22 +136,74 @@ function line(text: string, x: number, size: number, gapAfter = 0): PdfBlock {
   };
 }
 
-export function buildExamPdfBlocks(exam: PdfExam, answers: boolean, labels: { date: string; points: string; solution: string; answer: string; achieved: string; pointsShort?: string }): PdfBlock[] {
+export type ExamPdfLabels = {
+  date: string;
+  points: string;
+  solution: string;
+  answer: string;
+  achieved: string;
+  pointsShort?: string;
+  format?: string;
+  objectives?: string;
+  name?: string;
+  classLabel?: string;
+  subject?: string;
+  grade?: string;
+  correct?: string;
+  operator?: string;
+  requirement?: string;
+  gradingScale?: string;
+};
+
+export function buildExamPdfBlocks(exam: PdfExam, answers: boolean, labels: ExamPdfLabels): PdfBlock[] {
+  const total = exam.questions.reduce((sum, q) => sum + q.points, 0);
   const blocks: PdfBlock[] = [
     line('ExamVision AI', 18, 20, 10),
-    line(exam.title.slice(0, 120), 18, 13, 6),
-    line(`${labels.date}: ${new Date(exam.created).toLocaleDateString()}   |   ${labels.points}: ${exam.questions.reduce((sum, q) => sum + q.points, 0)}`, 18, 10, 12)
+    line(exam.title.slice(0, 120), 18, 13, 6)
   ];
+  const meta: string[] = [];
+  if (exam.subject) meta.push(`${labels.subject || 'Fach'}: ${exam.subject}`);
+  if (exam.gradeLevel) meta.push(`${labels.grade || 'Klasse'}: ${exam.gradeLevel}`);
+  meta.push(`${labels.date}: ${new Date(exam.created).toLocaleDateString()}`);
+  meta.push(`${labels.points}: ${total}`);
+  blocks.push(line(meta.join('   |   '), 18, 10, 6));
+  const header = [
+    `${exam.headerName || labels.name || 'Name'}: ________________`,
+    `${exam.headerClass || labels.classLabel || 'Klasse'}: ____________`,
+    `${exam.headerDate || labels.date || 'Datum'}: ____________`
+  ].join('     ');
+  blocks.push(line(header, 18, 10, exam.goal || exam.objectives?.length ? 4 : 10));
+  if (exam.goal) blocks.push(line(exam.goal, 18, 10, 6));
+  if (exam.objectives?.length) {
+    blocks.push(line(`${labels.objectives || 'Lernziele'}:`, 18, 11, 2));
+    for (const objective of exam.objectives.slice(0, 10)) blocks.push(line(`• ${objective}`, 22, 9, 1));
+    blocks[blocks.length - 1].gapAfter = 8;
+  }
+  if (exam.gradingScale) {
+    blocks.push(line(`${labels.gradingScale || 'Notenschlüssel'}: ${exam.gradingScale}`, 18, 9, 8));
+  }
   exam.questions.forEach((question, index) => {
     const short = labels.pointsShort || 'P.';
-    const prefix = answers && question.earned !== undefined ? `${index + 1}. ${question.prompt} (${question.earned}/${question.points} ${labels.achieved})` : `${index + 1}. ${question.prompt} (${question.points} ${short})`;
+    const format = question.format ? ` · ${question.format}` : '';
+    const prefix = answers && question.earned !== undefined
+      ? `${index + 1}.${format} ${question.prompt} (${question.earned}/${question.points} ${labels.achieved})`
+      : `${index + 1}.${format} ${question.prompt} (${question.points} ${short})`;
     blocks.push(line(prefix, 18, 11, 2));
+    const details = [question.operator, question.requirementLevel].filter(Boolean).join(' · ');
+    if (details) blocks.push(line(details, 22, 9, 2));
+    if (question.options?.length) {
+      question.options.slice(0, 4).forEach((option, optionIndex) => {
+        const marked = answers && optionIndex === question.correctIndex ? ` ${labels.correct || '✓'}` : '';
+        blocks.push(line(`${'ABCD'[optionIndex]}) ${option}${marked}`, 24, 10, 2));
+      });
+      blocks[blocks.length - 1].gapAfter = 4;
+    } else if (!answers) {
+      for (let i = 0; i < 3; i++) blocks.push({ lines: [{ text: '', x: 22, size: 9, rtl: false, height: 5 }], gapAfter: 0 });
+      blocks[blocks.length - 1].gapAfter = 5;
+    }
     if (answers) {
       blocks.push(line(`${labels.solution}: ${question.answer}`, 22, 9, 3));
       if (question.response) blocks.push(line(`${labels.answer}: ${question.response}`, 22, 9, 3));
-    } else {
-      for (let i = 0; i < 3; i++) blocks.push({ lines: [{ text: '', x: 22, size: 9, rtl: false, height: 5 }], gapAfter: 0 });
-      blocks[blocks.length - 1].gapAfter = 5;
     }
   });
   return blocks;

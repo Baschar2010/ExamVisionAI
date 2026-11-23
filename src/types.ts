@@ -30,7 +30,66 @@ export type Q = {
   missingConcepts?: string[];
   grader?: 'local' | 'ai';
   gradedBy?: 'local' | 'ai';
+  /** Optional metadata written by the five-step creation assistant. */
+  formatId?: string;
+  blockId?: string;
+  options?: string[];
+  correctIndex?: number;
+  operator?: string;
+  requirementLevel?: string;
+  objectiveIds?: string[];
 };
+
+/** One configurable block of tasks in the creation assistant. */
+export type CreationBlock = {
+  id: string;
+  formatId: string;
+  count: number;
+  points: number;
+  instruction: string;
+  operator: string;
+  requirementLevel: 'I' | 'II' | 'III';
+};
+
+export type CreationLanguage = 'de' | 'en' | 'ar' | 'fr' | 'es';
+export type CreationSourceMode = 'materials' | 'text' | 'topic' | 'mixed';
+export type CreationExamKind = 'classwork' | 'test' | 'practice' | 'worksheet';
+export type Differentiation = 'foundation' | 'regular' | 'support' | 'mixed';
+
+export type CreationConfig = {
+  lang: CreationLanguage;
+  gradeLevel: string;
+  subject: string;
+  topic: string;
+  title: string;
+  goal: string;
+  sourceMode: CreationSourceMode;
+  selectedDocIds: string[];
+  templateDocId: string;
+  templateId: string;
+  sourceText: string;
+  autoFormat: boolean;
+  preferredFormats: string[];
+  difficulty: 'easy' | 'medium' | 'hard';
+  objectives: string[];
+  blocks: CreationBlock[];
+  examKind: CreationExamKind;
+  duration: number;
+  differentiation: Differentiation;
+  scaffolding: boolean;
+  partialPoints: boolean;
+  showSolutions: boolean;
+  headerName: string;
+  headerClass: string;
+  headerDate: string;
+};
+
+export type ExamMeta = Pick<CreationConfig,
+  'lang' | 'gradeLevel' | 'topic' | 'goal' | 'sourceMode' | 'selectedDocIds' |
+  'templateDocId' | 'templateId' | 'sourceText' | 'autoFormat' | 'preferredFormats' |
+  'difficulty' | 'objectives' | 'blocks' | 'examKind' | 'differentiation' |
+  'scaffolding' | 'partialPoints' | 'showSolutions' | 'headerName' | 'headerClass' | 'headerDate'
+>;
 
 export type Exam = {
   id: string;
@@ -44,9 +103,11 @@ export type Exam = {
   timer?: ExamTimer;
   solutionDocId?: string;
   correctionDocId?: string;
+  /** Creation-assistant settings; absent on exams created before version 1.4. */
+  meta?: ExamMeta;
 };
 
-export type ArtifactKind = 'lesson' | 'worksheet' | 'practice' | 'presentation' | 'graphic';
+export type ArtifactKind = 'lesson' | 'worksheet' | 'practice' | 'presentation' | 'graphic' | 'unit' | 'scaffolding';
 
 export type Artifact = {
   id: string;

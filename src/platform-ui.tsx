@@ -3,10 +3,10 @@ import {
   Activity, ArrowDownToLine, ArrowRight, BarChart3, Bot, Brain, Check, ChevronLeft,
   ChevronRight, ClipboardList, Clock3, Download, FileCheck2, FilePlus2, FileText,
   FileUp, FolderOpen, GitBranch, GraduationCap, Image as ImageIcon, LayoutDashboard, LineChart,
-  ListChecks, MessageSquare, Network, PieChart, Presentation as PresentationIcon, Search, Send,
+  ListChecks, MessageSquare, Network, PieChart, Plus, Presentation as PresentationIcon, Search, Send,
   Settings, ShieldCheck, Sparkles, Target, Trash2, Upload, Wand2
 } from 'lucide-react';
-import { evaluateAnswer, type Difficulty, type SourcePassage } from './core.ts';
+import { estimateQuality, evaluateAnswer, type Difficulty, type SourcePassage } from './core.ts';
 import { localFeedback } from './grading.ts';
 import { suggestQuestions } from './assistant.ts';
 import { intentLabel, routeAssistant, type AssistantRouterLabels } from './assistant-router.ts';
@@ -14,6 +14,10 @@ import { buildLessonPlan, type LessonPlan } from './lesson.ts';
 import { buildWorksheet, type Worksheet } from './worksheet.ts';
 import { buildPresentation, type Presentation as PresentationModel } from './presentation.ts';
 import { buildGraphic, type GraphicModel, type GraphicType } from './graphics.ts';
+import {
+  buildScaffoldingPlan, buildUnitPlan, reorderUnitLessons,
+  type FlowLabels, type ScaffoldingPlan, type UnitPlan
+} from './to-teach-flows.ts';
 import { isRtlText, wrapText, type PdfBlock } from './pdf-layout.ts';
 import { safeFilename } from './file-naming.ts';
 import { saveBlobFile } from './native-io.ts';
@@ -30,6 +34,8 @@ const TOOL_ICONS: Record<StudioTool, any> = {
   practice: ListChecks,
   presentation: PresentationIcon,
   graphic: PieChart,
+  unit: GitBranch,
+  scaffolding: ListChecks,
   upload: Upload
 };
 
@@ -63,6 +69,8 @@ export function Dashboard({ p, t, learning, onNavigate, onStudio, onAsk, onOpenA
     { key: 'exam', label: t.new, sub: t.newsub, icon: FilePlus2, tone: 'violet', action: () => onNavigate('create') },
     { key: 'assistant', label: t.toolAssistant, sub: t.assistantSub, icon: Bot, tone: 'blue', action: () => onStudio('assistant') },
     { key: 'lesson', label: t.toolLesson, sub: t.lessonSub, icon: ClipboardList, tone: 'mint', action: () => onStudio('lesson') },
+    { key: 'unit', label: t.toolUnit, sub: t.unitSub, icon: GitBranch, tone: 'violet', action: () => onStudio('unit') },
+    { key: 'scaffolding', label: t.toolScaffolding, sub: t.scaffoldingSub, icon: ListChecks, tone: 'mint', action: () => onStudio('scaffolding') },
     { key: 'worksheet', label: t.toolWorksheet, sub: t.worksheetSub, icon: FileText, tone: 'peach', action: () => onStudio('worksheet') },
     { key: 'practice', label: t.toolPractice, sub: t.practiceSub, icon: ListChecks, tone: 'violet', action: () => onStudio('practice') },
     { key: 'presentation', label: t.toolPresentation, sub: t.presentationSub, icon: PresentationIcon, tone: 'blue', action: () => onStudio('presentation') },
@@ -77,7 +85,9 @@ export function Dashboard({ p, t, learning, onNavigate, onStudio, onAsk, onOpenA
     worksheet: t.artifactWorksheet,
     practice: t.artifactPractice,
     presentation: t.artifactPresentation,
-    graphic: t.artifactGraphic
+    graphic: t.artifactGraphic,
+    unit: t.artifactUnit,
+    scaffolding: t.artifactScaffolding
   };
 
   return <div className="dashboard">
@@ -196,6 +206,7 @@ export type StudioProps = {
   t: T;
   tool: StudioTool;
   initialArtifact: Artifact | null;
+  initialDocId?: string | null;
   selected: string[];
   setSelected: React.Dispatch<React.SetStateAction<string[]>>;
   workPassages: SourcePassage[];
@@ -208,7 +219,9 @@ export type StudioProps = {
   onAsk: (question: string) => void;
   onClearChat: () => void;
   onSaveArtifact: (artifact: Artifact) => void;
+  onUpdateArtifact: (artifact: Artifact) => void;
   onDeleteArtifact: (id: string) => void;
+  onUpdateDoc: (doc: Doc) => void;
   onExamFromQuestions: (questions: Q[]) => void;
   onExportPdf: (blocks: PdfBlock[], filename: string) => void;
   onExportArtifact: (artifact: Artifact) => void;
@@ -308,9 +321,9 @@ function downloadBlob(blob: Blob, filename: string, dialogTitle = 'Datei teilen 
 
 export function Studio(props: StudioProps) {
   const {
-    p, t, tool, initialArtifact, selected, setSelected, workPassages, allPassages, topics,
-    busy, progress, onUpload, onRemoveDoc, onAsk, onClearChat, onSaveArtifact,
-    onDeleteArtifact, onExamFromQuestions, onExportPdf, onExportArtifact, onError
+    p, t, tool, initialArtifact, initialDocId, selected, setSelected, workPassages, allPassages, topics,
+    busy, progress, onUpload, onRemoveDoc, onAsk, onClearChat, onSaveArtifact, onUpdateArtifact,
+    onUpdateDoc, onDeleteArtifact, onExamFromQuestions, onExportPdf, onExportArtifact, onError
   } = props;
 
   const [active, setActive] = useState<StudioTool>(tool);
@@ -336,21 +349,36 @@ export function Studio(props: StudioProps) {
   const [slide, setSlide] = useState(0);
   const [graphicType, setGraphicType] = useState<GraphicType>('bar');
   const [graphic, setGraphic] = useState<GraphicModel | null>(null);
+  const [unitPlan, setUnitPlan] = useState<UnitPlan | null>(null);
+  const [unitCount, setUnitCount] = useState(3);
+  const [scaffoldPlan, setScaffoldPlan] = useState<ScaffoldingPlan | null>(null);
+  const [editingArtifactId, setEditingArtifactId] = useState<string | null>(null);
+  const [editingDocId, setEditingDocId] = useState<string | null>(initialDocId || null);
+  const [docDraft, setDocDraft] = useState<Doc | null>(null);
   const [chatInput, setChatInput] = useState('');
   const [uploadRole, setUploadRole] = useState<Role>('material');
   const uploadRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
+    if (initialDocId) {
+      setEditingDocId(initialDocId);
+      setDocDraft(p.docs.find(doc => doc.id === initialDocId) || null);
+    }
     if (initialArtifact) {
       loadArtifact(initialArtifact);
     } else {
+      setEditingArtifactId(null);
+      if (!initialDocId) { setEditingDocId(null); setDocDraft(null); }
       setActive(tool);
     }
     // Parent controls tool changes; loading is intentionally keyed to the selected artifact.
-  }, [tool, initialArtifact]);
+  }, [tool, initialArtifact, initialDocId]);
 
   function loadArtifact(a: Artifact) {
     setActive(a.kind);
+    setEditingArtifactId(a.id);
+    setEditingDocId(null);
+    setDocDraft(null);
     setSubject(a.subject || '');
     setTopic(a.topic || '');
     setLang(a.lang || p.lang);
@@ -359,16 +387,20 @@ export function Studio(props: StudioProps) {
     if (a.kind === 'practice') { setPractice(a.data as Worksheet); setResponses({}); setResults({}); }
     if (a.kind === 'presentation') { setDeck(a.data as PresentationModel); setSlide(0); }
     if (a.kind === 'graphic') { setGraphic(a.data as GraphicModel); setGraphicType((a.data as GraphicModel).type); }
+    if (a.kind === 'unit') setUnitPlan(a.data as UnitPlan);
+    if (a.kind === 'scaffolding') setScaffoldPlan(a.data as ScaffoldingPlan);
     setMessage('');
   }
 
   function save(kind: ArtifactKind, title: string, data: unknown) {
     const artifact: Artifact = {
-      id: crypto.randomUUID(), kind, title, subject, topic,
-      created: new Date().toISOString(), lang, data
+      id: editingArtifactId || crypto.randomUUID(), kind, title, subject, topic,
+      created: editingArtifactId ? (p.artifacts.find(item => item.id === editingArtifactId)?.created || new Date().toISOString()) : new Date().toISOString(),
+      lang, data
     };
-    onSaveArtifact(artifact);
-    setMessage(t.artifactSaved);
+    if (editingArtifactId) onUpdateArtifact(artifact); else onSaveArtifact(artifact);
+    setEditingArtifactId(artifact.id);
+    setMessage(editingArtifactId ? t.artifactUpdated : t.artifactSaved);
   }
 
   function requirePassages(): SourcePassage[] {
@@ -386,6 +418,8 @@ export function Studio(props: StudioProps) {
     { key: 'practice', sub: t.practiceSub },
     { key: 'presentation', sub: t.presentationSub },
     { key: 'graphic', sub: t.graphicsSub },
+    { key: 'unit', sub: t.unitSub },
+    { key: 'scaffolding', sub: t.scaffoldingSub },
     { key: 'upload', sub: t.uploadSub }
   ];
 
@@ -396,11 +430,13 @@ export function Studio(props: StudioProps) {
   const selectedDocs = p.docs.filter(doc => doc.role === 'material');
   const toolTitles: Record<StudioTool, string> = {
     assistant: t.toolAssistant, lesson: t.toolLesson, worksheet: t.toolWorksheet,
-    practice: t.toolPractice, presentation: t.toolPresentation, graphic: t.toolGraphics, upload: t.toolUpload
+    practice: t.toolPractice, presentation: t.toolPresentation, graphic: t.toolGraphics,
+    unit: t.toolUnit, scaffolding: t.toolScaffolding, upload: t.toolUpload
   };
   const toolSubs: Record<StudioTool, string> = {
     assistant: t.assistantSub, lesson: t.lessonSub, worksheet: t.worksheetSub,
-    practice: t.practiceSub, presentation: t.presentationSub, graphic: t.graphicsSub, upload: t.uploadSub
+    practice: t.practiceSub, presentation: t.presentationSub, graphic: t.graphicsSub,
+    unit: t.unitSub, scaffolding: t.scaffoldingSub, upload: t.uploadSub
   };
 
   function triggerUpload(role: Role) {
@@ -443,6 +479,7 @@ export function Studio(props: StudioProps) {
       title: sheetTitle || topic || t.toolWorksheet, instructions: sheetInstructions, topic,
       difficulty, count: sheetCount, showSolutions, language: lang, unknownTopic: t.unknownTopic
     });
+    if (!result.questions.length) { onError(t.noText); return; }
     setSheet(result);
     save('worksheet', result.title, result);
   }
@@ -484,6 +521,7 @@ export function Studio(props: StudioProps) {
         teacherNote: t.teacherNote, defaultObjective: t.defaultObjective
       }
     });
+    if (!result.slides.length) { onError(t.noText); return; }
     setDeck(result);
     setSlide(0);
     save('presentation', result.title, result);
@@ -501,8 +539,84 @@ export function Studio(props: StudioProps) {
         step: t.step, noData: t.noData, average: t.average
       }
     });
+    if (!result.items.length) { onError(t.noText); return; }
     setGraphic(result);
     save('graphic', `${result.title}${topic ? `: ${topic}` : ''}`, result);
+  }
+
+  const flowLabels: FlowLabels = {
+    unitLesson: t.unitLesson,
+    scaffoldPhase1: t.scaffoldPhase1,
+    scaffoldPhase2: t.scaffoldPhase2,
+    scaffoldPhase3: t.scaffoldPhase3,
+    scaffoldPhase4: t.scaffoldPhase4,
+    strongSupport: t.strongSupport,
+    sharedSupport: t.sharedSupport,
+    guidedSupport: t.guidedSupport,
+    independentSupport: t.independentSupport
+  };
+
+  function makeUnit() {
+    const passages = requirePassages();
+    if (!passages.length) return;
+    const plan = buildUnitPlan({
+      subject, topic, language: lang, minutes, lessonCount: unitCount,
+      objectives, passages, labels: flowLabels
+    });
+    setUnitPlan(plan);
+    save('unit', plan.title, plan);
+  }
+
+  function makeScaffolding() {
+    const passages = requirePassages();
+    if (!passages.length) return;
+    const plan = buildScaffoldingPlan({ subject, topic, language: lang, objectives, passages, labels: flowLabels });
+    setScaffoldPlan(plan);
+    save('scaffolding', plan.title, plan);
+  }
+
+  function updateLesson(plan: LessonPlan, index: number, patch: Partial<LessonPlan['phases'][number]>) {
+    setLesson({ ...plan, phases: plan.phases.map((phase, i) => i === index ? { ...phase, ...patch } : phase) });
+  }
+
+  function updateQuestion(sheet: Worksheet, index: number, patch: Partial<Worksheet['questions'][number]>) {
+    const next = { ...sheet, questions: sheet.questions.map((question, i) => i === index ? { ...question, ...patch } : question) };
+    if (sheet === practice) setPractice(next); else setSheet(next);
+  }
+
+  function updateSlide(deck: PresentationModel, index: number, patch: Partial<PresentationModel['slides'][number]>) {
+    setDeck({ ...deck, slides: deck.slides.map((slideItem, i) => i === index ? { ...slideItem, ...patch } : slideItem) });
+  }
+
+  function updateGraphicItem(model: GraphicModel, index: number, patch: Partial<GraphicModel['items'][number]>) {
+    setGraphic({ ...model, items: model.items.map((itemValue, i) => i === index ? { ...itemValue, ...patch } : itemValue) });
+  }
+
+  function linesToBullets(value: string): string[] {
+    return value.split('\n').map(line => line.trim()).filter(Boolean);
+  }
+
+  function saveCurrent() {
+    if (active === 'lesson' && lesson) save('lesson', lesson.title, lesson);
+    if (active === 'worksheet' && sheet) save('worksheet', sheet.title, sheet);
+    if (active === 'practice' && practice) save('practice', practice.title, practice);
+    if (active === 'presentation' && deck) save('presentation', deck.title, deck);
+    if (active === 'graphic' && graphic) save('graphic', graphic.title, graphic);
+    if (active === 'unit' && unitPlan) save('unit', unitPlan.title, unitPlan);
+    if (active === 'scaffolding' && scaffoldPlan) save('scaffolding', scaffoldPlan.title, scaffoldPlan);
+  }
+
+  function saveDoc() {
+    if (!docDraft) return;
+    onUpdateDoc({ ...docDraft, name: docDraft.name.trim() || docDraft.name, quality: estimateQuality(docDraft.text) });
+    setEditingDocId(null);
+    setDocDraft(null);
+    setMessage(t.materialSaved);
+  }
+
+  function cancelDocEdit() {
+    setEditingDocId(null);
+    setDocDraft(null);
   }
 
   function exportCurrent(kind: ArtifactKind, title: string, data: unknown) {
@@ -636,13 +750,22 @@ export function Studio(props: StudioProps) {
         </div>
         <div className="workcard previewcard">
           {lesson ? <>
-            <div className="previewhead"><h2>{lesson.title}</h2><button className="btn secondary" onClick={() => exportCurrent('lesson', lesson.title, lesson)}><ArrowDownToLine size={16} /> {t.pdfDownload}</button></div>
+            <div className="previewhead"><h2>{lesson.title}</h2><div className="btnrow">
+              <button className="btn secondary" onClick={saveCurrent}><Check size={16} /> {t.saveChanges}</button>
+              <button className="btn secondary" onClick={() => exportCurrent('lesson', lesson.title, lesson)}><ArrowDownToLine size={16} /> {t.pdfDownload}</button>
+            </div></div>
+            <label><span className="fieldlabel">{t.editContent}</span><input value={lesson.title} onChange={e => setLesson({ ...lesson, title: e.target.value })} /></label>
             <div className="metarow">{lesson.meta.map(item => <span key={item.label}><b>{item.label}:</b> {item.value}</span>)}</div>
             <h3>{t.objectives}</h3><ul>{lesson.objectives.map((x, i) => <li key={i}>{x}</li>)}</ul>
             {lesson.phases.map((phase, i) => <article className="phase" key={i}>
-              <header><b>{i + 1}. {phase.name}</b><span>{phase.minutes} {t.minutesShort}</span></header>
-              <p>{phase.activity}</p><small>{phase.teacher} · {phase.students}</small>
-              <small>{t.materials}: {phase.material}</small>
+              <header>
+                <input value={phase.name} aria-label={`${t.phases} ${i + 1}`} onChange={e => updateLesson(lesson, i, { name: e.target.value })} />
+                <input type="number" min={1} value={phase.minutes} aria-label={t.duration} onChange={e => updateLesson(lesson, i, { minutes: Math.max(1, +e.target.value || 1) })} />
+              </header>
+              <textarea rows={2} value={phase.activity} aria-label={t.description} onChange={e => updateLesson(lesson, i, { activity: e.target.value })} />
+              <div className="twofields"><input value={phase.teacher} aria-label={t.teacher} onChange={e => updateLesson(lesson, i, { teacher: e.target.value })} />
+                <input value={phase.students} aria-label={t.students} onChange={e => updateLesson(lesson, i, { students: e.target.value })} /></div>
+              <input value={phase.material} aria-label={t.materials} onChange={e => updateLesson(lesson, i, { material: e.target.value })} />
             </article>)}
             <div className="tip"><ShieldCheck size={16} /> {t.groundText}</div>
           </> : <div className="miniempty"><ClipboardList /> {t.lessonSub}</div>}
@@ -664,13 +787,23 @@ export function Studio(props: StudioProps) {
         </div>
         <div className="workcard previewcard">
           {sheet ? <>
-            <div className="previewhead"><h2>{sheet.title}</h2><button className="btn secondary" onClick={() => exportCurrent('worksheet', sheet.title, sheet)}><ArrowDownToLine size={16} /> {t.pdfDownload}</button></div>
-            <p className="muted">{sheet.instructions} · {sheet.showSolutions ? t.solutionsShown : t.solutionsHidden}</p>
+            <div className="previewhead"><h2>{sheet.title}</h2><div className="btnrow">
+              <button className="btn secondary" onClick={saveCurrent}><Check size={16} /> {t.saveChanges}</button>
+              <button className="btn secondary" onClick={() => exportCurrent('worksheet', sheet.title, sheet)}><ArrowDownToLine size={16} /> {t.pdfDownload}</button>
+            </div></div>
+            <label><span className="fieldlabel">{t.editContent}</span><input value={sheet.title} onChange={e => setSheet({ ...sheet, title: e.target.value })} /></label>
+            <label><span className="fieldlabel">{t.worksheetInstructions}</span><textarea rows={2} value={sheet.instructions} onChange={e => setSheet({ ...sheet, instructions: e.target.value })} /></label>
+            <p className="muted">{sheet.showSolutions ? t.solutionsShown : t.solutionsHidden}</p>
             {sheet.questions.map((question, i) => <article className="sheetquestion" key={question.id}>
-              <header><b>{i + 1}. {question.prompt}</b><span>{question.points}</span></header>
-              {sheet.showSolutions && <p><b>{t.solution}:</b> {question.answer}</p>}
+              <header>
+                <input value={question.prompt} aria-label={`${t.taskLabel} ${i + 1}`} onChange={e => updateQuestion(sheet, i, { prompt: e.target.value })} />
+                <input type="number" min={1} value={question.points} aria-label={t.pointsWord} onChange={e => updateQuestion(sheet, i, { points: Math.max(1, +e.target.value || 1) })} />
+              </header>
+              <textarea rows={2} value={question.answer} aria-label={t.solution} onChange={e => updateQuestion(sheet, i, { answer: e.target.value })} />
               <small>{t.source}: {question.source}</small>
+              <button className="textbtn" onClick={() => setSheet({ ...sheet, questions: sheet.questions.filter((_, index) => index !== i) })}><Trash2 size={14} /> {t.removeQuestion}</button>
             </article>)}
+            <button className="btn secondary wide" onClick={() => setSheet({ ...sheet, questions: [...sheet.questions, { id: crypto.randomUUID(), prompt: '', answer: '', source: topic || t.source, topic, points: 1 }] })}><Plus size={16} /> {t.addQuestion}</button>
             <button className="btn secondary wide" onClick={() => onExamFromQuestions(sheet.questions.map(q => ({ ...q, response: '' })))}><FileCheck2 size={16} /> {t.openAsExam}</button>
           </> : <div className="miniempty"><FileText /> {t.worksheetEmpty}</div>}
         </div>
@@ -689,16 +822,26 @@ export function Studio(props: StudioProps) {
         </div>
         <div className="workcard previewcard">
           {practice ? <>
-            <div className="previewhead"><h2>{practice.title}</h2><button className="btn secondary" onClick={checkPractice}><Check size={16} /> {t.practiceCheck}</button></div>
+            <div className="previewhead"><h2>{practice.title}</h2><div className="btnrow">
+              <button className="btn secondary" onClick={saveCurrent}><Check size={16} /> {t.saveChanges}</button>
+              <button className="btn secondary" onClick={checkPractice}><Check size={16} /> {t.practiceCheck}</button>
+            </div></div>
+            <label><span className="fieldlabel">{t.editContent}</span><input value={practice.title} onChange={e => setPractice({ ...practice, title: e.target.value })} /></label>
             {practice.questions.map((question, i) => {
               const result = results[question.id];
               return <article className="sheetquestion" key={question.id}>
-                <header><b>{i + 1}. {question.prompt}</b><span>{question.points}</span></header>
+                <header>
+                  <input value={question.prompt} aria-label={`${t.taskLabel} ${i + 1}`} onChange={e => updateQuestion(practice, i, { prompt: e.target.value })} />
+                  <input type="number" min={1} value={question.points} aria-label={t.pointsWord} onChange={e => updateQuestion(practice, i, { points: Math.max(1, +e.target.value || 1) })} />
+                </header>
                 <textarea rows={2} value={responses[question.id] || ''} onChange={e => setResponses(x => ({ ...x, [question.id]: e.target.value }))} />
+                <textarea rows={2} value={question.answer} aria-label={t.solution} onChange={e => updateQuestion(practice, i, { answer: e.target.value })} />
                 {result && <p className={result.points === question.points ? 'ok' : 'partial'}><b>{t.practiceScore}: {result.points}/{question.points}</b> · {result.feedback}</p>}
                 {result && result.points < question.points && <p><button className="textbtn" onClick={() => setResponses(x => ({ ...x, [question.id]: question.answer }))}>{t.revealSolution}</button></p>}
+                <button className="textbtn" onClick={() => setPractice({ ...practice, questions: practice.questions.filter((_, index) => index !== i) })}><Trash2 size={14} /> {t.removeQuestion}</button>
               </article>;
             })}
+            <button className="btn secondary wide" onClick={() => setPractice({ ...practice, questions: [...practice.questions, { id: crypto.randomUUID(), prompt: '', answer: '', source: topic || t.source, topic, points: 1 }] })}><Plus size={16} /> {t.addQuestion}</button>
             <button className="btn secondary wide" onClick={() => exportCurrent('practice', practice.title, practice)}><ArrowDownToLine size={16} /> {t.pdfDownload}</button>
           </> : <div className="miniempty"><Brain /> {t.practiceSub}</div>}
         </div>
@@ -719,17 +862,22 @@ export function Studio(props: StudioProps) {
         </div>
         <div className="workcard previewcard">
           {deck ? <>
-            <div className="previewhead"><h2>{t.slide} {slide + 1} / {deck.slides.length}</h2>
-              <button className="btn secondary" onClick={() => exportCurrent('presentation', deck.title, deck)}><ArrowDownToLine size={16} /> {t.pdfDownload}</button></div>
+            <div className="previewhead"><h2>{t.slide} {slide + 1} / {deck.slides.length}</h2><div className="btnrow">
+              <button className="btn secondary" onClick={saveCurrent}><Check size={16} /> {t.saveChanges}</button>
+              <button className="btn secondary" onClick={() => exportCurrent('presentation', deck.title, deck)}><ArrowDownToLine size={16} /> {t.pdfDownload}</button>
+            </div></div>
+            <label><span className="fieldlabel">{t.editContent}</span><input value={deck.title} onChange={e => setDeck({ ...deck, title: e.target.value })} /></label>
             <article className="slidepreview">
               <span className="eyebrow">{deck.slides[slide].kind}</span>
-              <h2>{deck.slides[slide].title}</h2>
-              <ul>{deck.slides[slide].bullets.map((bullet, i) => <li key={i}>{bullet}</li>)}</ul>
-              <small>{t.slideNotes}: {deck.slides[slide].note}</small>
+              <label><span className="fieldlabel">{t.slideTitle}</span><input value={deck.slides[slide].title} onChange={e => updateSlide(deck, slide, { title: e.target.value })} /></label>
+              <label><span className="fieldlabel">{t.slideBullets}</span><textarea rows={4} value={deck.slides[slide].bullets.join('\n')} onChange={e => updateSlide(deck, slide, { bullets: linesToBullets(e.target.value) })} /></label>
+              <label><span className="fieldlabel">{t.slideNotes}</span><textarea rows={2} value={deck.slides[slide].note} onChange={e => updateSlide(deck, slide, { note: e.target.value })} /></label>
               {deck.slides[slide].source && <small>{t.source}: {deck.slides[slide].source}</small>}
+              <button className="textbtn" onClick={() => { setDeck({ ...deck, slides: deck.slides.filter((_, index) => index !== slide) }); setSlide(Math.max(0, slide - 1)); }}><Trash2 size={14} /> {t.removeSlide}</button>
             </article>
             <div className="btnrow"><button className="btn secondary" disabled={slide === 0} onClick={() => setSlide(x => x - 1)}><ChevronLeft size={16} /> {t.prevSlide}</button>
-              <button className="btn secondary" disabled={slide >= deck.slides.length - 1} onClick={() => setSlide(x => x + 1)}>{t.nextSlide} <ChevronRight size={16} /></button></div>
+              <button className="btn secondary" disabled={slide >= deck.slides.length - 1} onClick={() => setSlide(x => x + 1)}>{t.nextSlide} <ChevronRight size={16} /></button>
+              <button className="btn secondary" onClick={() => { setDeck({ ...deck, slides: [...deck.slides, { id: crypto.randomUUID(), kind: 'concept', title: '', bullets: [], note: '', source: '' }] }); setSlide(deck.slides.length); }}><Plus size={16} /> {t.addSlide}</button></div>
           </> : <div className="miniempty"><PresentationIcon /> {t.presentationIntro}</div>}
         </div>
       </div>}
@@ -748,12 +896,95 @@ export function Studio(props: StudioProps) {
         <div className="workcard previewcard">
           {graphic ? <>
             <div className="previewhead"><h2>{graphic.title}</h2><div className="btnrow">
+              <button className="btn secondary" onClick={saveCurrent}><Check size={16} /> {t.saveChanges}</button>
               <button className="btn secondary" onClick={() => downloadBlob(new Blob([graphicSvg(graphic)], { type: 'image/svg+xml;charset=utf-8' }), `${safeFilename(graphic.title)}.svg`, t.shareFile)}><Download size={16} /> {t.exportSvg}</button>
               <button className="btn secondary" onClick={() => void exportGraphicPng()}><ImageIcon size={16} /> {t.exportPng}</button>
               <button className="btn secondary" onClick={() => exportCurrent('graphic', graphic.title, graphic)}><ArrowDownToLine size={16} /> {t.pdfDownload}</button>
             </div></div>
+            <div className="editgrid"><label><span className="fieldlabel">{t.editContent}</span><input value={graphic.title} onChange={e => setGraphic({ ...graphic, title: e.target.value })} /></label>
+              <label><span className="fieldlabel">{t.topic}</span><input value={graphic.subtitle} onChange={e => setGraphic({ ...graphic, subtitle: e.target.value })} /></label></div>
+            {graphic.items.map((itemValue, i) => <article className="sheetquestion" key={i}>
+              <div className="editgrid"><label><span className="fieldlabel">{t.itemLabel}</span><input value={itemValue.label} onChange={e => updateGraphicItem(graphic, i, { label: e.target.value })} /></label>
+                <label><span className="fieldlabel">{t.itemValue}</span><input value={itemValue.value ?? ''} onChange={e => updateGraphicItem(graphic, i, { value: e.target.value === '' ? undefined : Number(e.target.value) || 0 })} /></label></div>
+              <textarea rows={2} value={itemValue.text || ''} aria-label={t.itemDetail} onChange={e => updateGraphicItem(graphic, i, { text: e.target.value })} />
+              <button className="textbtn" onClick={() => setGraphic({ ...graphic, items: graphic.items.filter((_, index) => index !== i) })}><Trash2 size={14} /> {t.removeItem}</button>
+            </article>)}
+            <button className="btn secondary wide" onClick={() => setGraphic({ ...graphic, items: [...graphic.items, { label: '', text: '' }] })}><Plus size={16} /> {t.addItem}</button>
             <div className="graphicframe" dangerouslySetInnerHTML={{ __html: graphicSvg(graphic) }} />
           </> : <div className="miniempty"><Network /> {t.graphicsSub}</div>}
+        </div>
+      </div>}
+
+      {active === 'unit' && <div className="studio-grid">
+        <div className="workcard formstack">
+          <label><span className="fieldlabel">{t.subject}</span><input value={subject} onChange={e => setSubject(e.target.value)} /></label>
+          <label><span className="fieldlabel">{t.topic}</span><input list="studio-topics" value={topic} onChange={e => setTopic(e.target.value)} /></label>
+          <label><span className="fieldlabel">{t.objectives}</span><textarea rows={3} value={objectives} onChange={e => setObjectives(e.target.value)} placeholder={t.objectivePlaceholder} /></label>
+          <div className="twofields"><label><span className="fieldlabel">{t.unitLessonCount}</span><input type="number" min={1} max={12} value={unitCount} onChange={e => setUnitCount(Math.max(1, Math.min(12, +e.target.value || 3)))} /></label>
+            <label><span className="fieldlabel">{t.duration}</span><input type="number" min={20} max={180} value={minutes} onChange={e => setMinutes(Math.max(20, Math.min(180, +e.target.value || 45)))} /></label></div>
+          <label><span className="fieldlabel">{t.language}</span><select value={lang} onChange={e => setLang(e.target.value)}>
+            {[['de', 'Deutsch'], ['en', 'English'], ['ar', 'العربية'], ['fr', 'Français'], ['es', 'Español']].map(([value, name]) => <option key={value} value={value}>{name}</option>)}
+          </select></label>
+          <MaterialPicker t={t} docs={selectedDocs} selected={selected} setSelected={setSelected} />
+          <button className="btn primary wide" onClick={makeUnit}><GitBranch size={17} /> {t.generateUnit}</button>
+        </div>
+        <div className="workcard previewcard">
+          {unitPlan ? <>
+            <div className="previewhead"><h2>{unitPlan.title}</h2><div className="btnrow">
+              <button className="btn secondary" onClick={saveCurrent}><Check size={16} /> {t.saveChanges}</button>
+              <button className="btn secondary" onClick={() => exportCurrent('unit', unitPlan.title, unitPlan)}><ArrowDownToLine size={16} /> {t.pdfDownload}</button>
+            </div></div>
+            <label><span className="fieldlabel">{t.editContent}</span><input value={unitPlan.title} onChange={e => setUnitPlan({ ...unitPlan, title: e.target.value })} /></label>
+            <label><span className="fieldlabel">{t.objectives}</span><textarea rows={3} value={unitPlan.objectives.join('\n')} onChange={e => setUnitPlan({ ...unitPlan, objectives: linesToBullets(e.target.value) })} /></label>
+            {unitPlan.lessons.map((lesson, i) => <article className="phase" key={lesson.id}>
+              <header><b>{i + 1}.</b><div className="btnrow">
+                <button className="iconbtn" title={t.moveUp} aria-label={t.moveUp} disabled={i === 0} onClick={() => setUnitPlan(reorderUnitLessons(unitPlan, lesson.id, -1))}>↑</button>
+                <button className="iconbtn" title={t.moveDown} aria-label={t.moveDown} disabled={i === unitPlan.lessons.length - 1} onClick={() => setUnitPlan(reorderUnitLessons(unitPlan, lesson.id, 1))}>↓</button>
+                <button className="iconbtn danger" title={t.removeLesson} aria-label={t.removeLesson} onClick={() => setUnitPlan({ ...unitPlan, lessons: unitPlan.lessons.filter(item => item.id !== lesson.id) })}><Trash2 size={15} /></button>
+              </div></header>
+              <label><span className="fieldlabel">{t.editContent}</span><input value={lesson.title} onChange={e => setUnitPlan({ ...unitPlan, lessons: unitPlan.lessons.map(item => item.id === lesson.id ? { ...item, title: e.target.value } : item) })} /></label>
+              <label><span className="fieldlabel">{t.topic}</span><input value={lesson.topic} onChange={e => setUnitPlan({ ...unitPlan, lessons: unitPlan.lessons.map(item => item.id === lesson.id ? { ...item, topic: e.target.value } : item) })} /></label>
+              <label><span className="fieldlabel">{t.description}</span><textarea rows={2} value={lesson.description} onChange={e => setUnitPlan({ ...unitPlan, lessons: unitPlan.lessons.map(item => item.id === lesson.id ? { ...item, description: e.target.value } : item) })} /></label>
+              <div className="twofields"><label><span className="fieldlabel">{t.duration}</span><input type="number" min={10} value={lesson.minutes} onChange={e => setUnitPlan({ ...unitPlan, lessons: unitPlan.lessons.map(item => item.id === lesson.id ? { ...item, minutes: Math.max(10, +e.target.value || 10) } : item) })} /></label>
+                <label><span className="fieldlabel">{t.unitCompetencies}</span><input value={lesson.competencies.join(', ')} onChange={e => setUnitPlan({ ...unitPlan, lessons: unitPlan.lessons.map(item => item.id === lesson.id ? { ...item, competencies: linesToBullets(e.target.value.replace(/,\s*/g, '\n')) } : item) })} /></label></div>
+              <label><span className="fieldlabel">{t.objectives}</span><textarea rows={2} value={lesson.objectives.join('\n')} onChange={e => setUnitPlan({ ...unitPlan, lessons: unitPlan.lessons.map(item => item.id === lesson.id ? { ...item, objectives: linesToBullets(e.target.value) } : item) })} /></label>
+              <small>{t.source}: {lesson.source || '—'}</small>
+            </article>)}
+            <button className="btn secondary wide" onClick={() => setUnitPlan({ ...unitPlan, lessons: [...unitPlan.lessons, { id: crypto.randomUUID(), title: `${t.unitLesson} ${unitPlan.lessons.length + 1}`, topic, description: '', competencies: [], objectives: [], minutes: 45, source: '' }] })}><Plus size={16} /> {t.addLesson}</button>
+          </> : <div className="miniempty"><GitBranch /> {t.unitSub}</div>}
+        </div>
+      </div>}
+
+      {active === 'scaffolding' && <div className="studio-grid">
+        <div className="workcard formstack">
+          <label><span className="fieldlabel">{t.subject}</span><input value={subject} onChange={e => setSubject(e.target.value)} /></label>
+          <label><span className="fieldlabel">{t.topic}</span><input list="studio-topics" value={topic} onChange={e => setTopic(e.target.value)} /></label>
+          <label><span className="fieldlabel">{t.objectives}</span><textarea rows={3} value={objectives} onChange={e => setObjectives(e.target.value)} placeholder={t.objectivePlaceholder} /></label>
+          <label><span className="fieldlabel">{t.language}</span><select value={lang} onChange={e => setLang(e.target.value)}>
+            {[['de', 'Deutsch'], ['en', 'English'], ['ar', 'العربية'], ['fr', 'Français'], ['es', 'Español']].map(([value, name]) => <option key={value} value={value}>{name}</option>)}
+          </select></label>
+          <MaterialPicker t={t} docs={selectedDocs} selected={selected} setSelected={setSelected} />
+          <button className="btn primary wide" onClick={makeScaffolding}><ListChecks size={17} /> {t.generateScaffolding}</button>
+        </div>
+        <div className="workcard previewcard">
+          {scaffoldPlan ? <>
+            <div className="previewhead"><h2>{scaffoldPlan.title}</h2><div className="btnrow">
+              <button className="btn secondary" onClick={saveCurrent}><Check size={16} /> {t.saveChanges}</button>
+              <button className="btn secondary" onClick={() => exportCurrent('scaffolding', scaffoldPlan.title, scaffoldPlan)}><ArrowDownToLine size={16} /> {t.pdfDownload}</button>
+            </div></div>
+            <label><span className="fieldlabel">{t.editContent}</span><input value={scaffoldPlan.title} onChange={e => setScaffoldPlan({ ...scaffoldPlan, title: e.target.value })} /></label>
+            <label><span className="fieldlabel">{t.objectives}</span><textarea rows={3} value={scaffoldPlan.objectives.join('\n')} onChange={e => setScaffoldPlan({ ...scaffoldPlan, objectives: linesToBullets(e.target.value) })} /></label>
+            {scaffoldPlan.phases.map((phase, i) => <article className="phase" key={phase.id}>
+              <header><b>{i + 1}.</b><button className="iconbtn danger" title={t.removePhase} aria-label={t.removePhase} onClick={() => setScaffoldPlan({ ...scaffoldPlan, phases: scaffoldPlan.phases.filter(item => item.id !== phase.id) })}><Trash2 size={15} /></button></header>
+              <label><span className="fieldlabel">{t.phases}</span><input value={phase.name} onChange={e => setScaffoldPlan({ ...scaffoldPlan, phases: scaffoldPlan.phases.map(item => item.id === phase.id ? { ...item, name: e.target.value } : item) })} /></label>
+              <label><span className="fieldlabel">{t.subjectObjective}</span><input value={phase.subjectObjective} onChange={e => setScaffoldPlan({ ...scaffoldPlan, phases: scaffoldPlan.phases.map(item => item.id === phase.id ? { ...item, subjectObjective: e.target.value } : item) })} /></label>
+              <label><span className="fieldlabel">{t.languageObjective}</span><input value={phase.languageObjective} onChange={e => setScaffoldPlan({ ...scaffoldPlan, phases: scaffoldPlan.phases.map(item => item.id === phase.id ? { ...item, languageObjective: e.target.value } : item) })} /></label>
+              <label><span className="fieldlabel">{t.scaffoldTask}</span><textarea rows={2} value={phase.task} onChange={e => setScaffoldPlan({ ...scaffoldPlan, phases: scaffoldPlan.phases.map(item => item.id === phase.id ? { ...item, task: e.target.value } : item) })} /></label>
+              <div className="twofields"><label><span className="fieldlabel">{t.scaffoldSupport}</span><input value={phase.support} onChange={e => setScaffoldPlan({ ...scaffoldPlan, phases: scaffoldPlan.phases.map(item => item.id === phase.id ? { ...item, support: e.target.value } : item) })} /></label>
+                <label><span className="fieldlabel">{t.scaffoldNext}</span><input value={phase.nextStep} onChange={e => setScaffoldPlan({ ...scaffoldPlan, phases: scaffoldPlan.phases.map(item => item.id === phase.id ? { ...item, nextStep: e.target.value } : item) })} /></label></div>
+            </article>)}
+            <button className="btn secondary wide" onClick={() => setScaffoldPlan({ ...scaffoldPlan, phases: [...scaffoldPlan.phases, { id: crypto.randomUUID(), name: t.scaffoldPhase4, subjectObjective: '', languageObjective: '', task: '', support: t.independentSupport, nextStep: '' }] })}><Plus size={16} /> {t.addPhase}</button>
+          </> : <div className="miniempty"><ListChecks /> {t.scaffoldingSub}</div>}
         </div>
       </div>}
 
@@ -776,8 +1007,21 @@ export function Studio(props: StudioProps) {
           {p.docs.length === 0 ? <div className="miniempty"><FileUp /> {t.noData}</div> : <div className="itemlist">{p.docs.map(doc =>
             <div className="itemrow" key={doc.id}>
               <span className="itemicon blue">{doc.type === 'application/pdf' ? <FileText size={18} /> : <ImageIcon size={18} />}</span>
-              <span><b>{doc.name}</b><small>{doc.role === 'material' ? t.material : doc.role === 'template' ? t.oldPaper : t.answerSheet} · {doc.pages} {t.pagesShort} · {Math.round(doc.quality * 100)}% {t.readability}</small>
-                {(doc.ocrWarnings?.length || 0) > 0 && <small className="warning">{t.unreadablePages}: {doc.ocrWarnings!.join(', ')}</small>}</span>
+              {editingDocId === doc.id && docDraft ? <div className="docedit">
+                <input value={docDraft.name} aria-label={t.editMaterial} onChange={e => setDocDraft({ ...docDraft, name: e.target.value })} />
+                <select value={docDraft.role} aria-label={t.editMaterial} onChange={e => setDocDraft({ ...docDraft, role: e.target.value as Role })}>
+                  <option value="material">{t.material}</option><option value="template">{t.oldPaper}</option><option value="answers">{t.answerSheet}</option>
+                </select>
+                <textarea rows={5} value={docDraft.text} aria-label={t.editMaterial} onChange={e => setDocDraft({ ...docDraft, text: e.target.value })} />
+                <div className="btnrow"><button className="btn primary" onClick={saveDoc}><Check size={15} /> {t.saveMaterial}</button>
+                  <button className="btn secondary" onClick={cancelDocEdit}>{t.cancel}</button></div>
+              </div> : <span><b>{doc.name}</b><small>{doc.role === 'material' ? t.material : doc.role === 'template' ? t.oldPaper : t.answerSheet} · {doc.pages} {t.pagesShort} · {Math.round(doc.quality * 100)}% {t.readability}</small>
+                {(doc.ocrWarnings?.length || 0) > 0 && <small className="warning">{t.unreadablePages}: {doc.ocrWarnings!.join(', ')}</small>}</span>}
+              <button className="iconbtn" title={t.editMaterial} aria-label={t.editMaterial} onClick={() => {
+                if (editingDocId === doc.id) { cancelDocEdit(); return; }
+                setEditingDocId(doc.id);
+                setDocDraft({ ...doc });
+              }}><Settings size={16} /></button>
               <button className="iconbtn danger" title={t.deleteFile} onClick={() => onRemoveDoc(doc.id)}><Trash2 size={16} /></button>
             </div>)}</div>}
         </div>

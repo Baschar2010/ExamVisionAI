@@ -26,6 +26,27 @@ test('exam blocks include numbered prompts, solutions and answer space', () => {
   assert.match(text, /Antwort: Paper\./);
 });
 
+test('exam blocks show header, objectives, formats and marked multiple-choice options', () => {
+  const blocks = buildExamPdfBlocks(
+    {
+      title: 'Biologie', created: '2026-11-23T10:00:00.000Z', subject: 'Biologie', gradeLevel: '8',
+      headerName: 'Name', headerClass: 'Klasse', headerDate: 'Datum',
+      goal: 'Die Fotosynthese erklären', objectives: ['Chlorophyll benennen'], gradingScale: '92/81/67',
+      questions: [{ prompt: 'Wähle die richtige Antwort.', answer: 'Chlorophyll', points: 3, format: 'Multiple Choice', options: ['Glucose', 'Chlorophyll', 'Stärke', 'Wasser'], correctIndex: 1 }]
+    },
+    true,
+    { date: 'Datum', points: 'Punkte', solution: 'Lösung', answer: 'Antwort', achieved: 'erreicht', correct: 'richtig' }
+  );
+  const text = blocks.flatMap(block => block.lines.map(line => line.text)).join('\n');
+  assert.match(text, /Fach: Biologie/);
+  assert.match(text, /Klasse: 8/);
+  assert.match(text, /Lernziele:/);
+  assert.match(text, /Chlorophyll benennen/);
+  assert.match(text, /Multiple Choice/);
+  assert.match(text, /B\) Chlorophyll richtig/);
+  assert.match(text, /Notenschlüssel/);
+});
+
 test('pagination starts a new page before the bottom margin and resets y', () => {
   const blocks = Array.from({ length: 8 }, () => ({ lines: [{ text: 'Zeile', x: 18, size: 10, rtl: false, height: 40 }], gapAfter: 0 }));
   const pages = paginateBlocks(blocks, { top: 20, bottom: 100 });

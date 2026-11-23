@@ -10,3 +10,4 @@ android/local.properties
 android/**/build/
 .gradle-user-home/
 release/
+*.traineddata

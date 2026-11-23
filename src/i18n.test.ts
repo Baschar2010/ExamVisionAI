@@ -19,7 +19,7 @@ test('Arabic translations contain real Arabic script and no untranslated placeho
 });
 
 test('all keys referenced in the UI exist in every language', () => {
-  const sources = ['./main.tsx', './platform-ui.tsx']
+  const sources = ['./main.tsx', './platform-ui.tsx', './exam-wizard.tsx']
     .map(file => readFileSync(new URL(file, import.meta.url), 'utf8'))
     .join('\n');
   const used = new Set([...sources.matchAll(/\bt\.([A-Za-z][A-Za-z0-9]*)/g)].map(match => match[1]));

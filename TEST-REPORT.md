@@ -1,6 +1,6 @@
 # Testbericht
 
-Stand: 23.11.2026. Quellstand: v1.3.0 – dauerhafte Speicherung, native PDF-/Datei-Ausgabe, „Meine Arbeiten“, mobile Navigation und Android-Konfiguration. Die Reparaturänderungen sind zum Zeitpunkt dieses Berichts noch nicht committet. Frühere Browser-E2E-Ergebnisse unten beziehen sich ausdrücklich auf den vorherigen Stand.
+Stand: 23.11.2026. Aktueller Quellstand: v1.4.0 – fünfstufiger Prüfungsassistent, 43 eigene Aufgabentypen, sieben Studio-Artefaktarten inklusive Unterrichtsreihe und Scaffolding, Artefakt-/Materialbearbeitung und Schutz vor leeren Ergebnissen. Die Abschnitte 1–9 dokumentieren ausdrücklich die früheren Stände; die aktuellen Prüfungen stehen in Abschnitt 10.
 
 ## 1. Automatische Prüfungen
 
@@ -127,3 +127,56 @@ Neue Unit-Tests:
 - Signatur: debug-signiert durch den Workflow (`assembleDebug`). Wie bei v1.2.1 kann sich das Debug-Zertifikat zwischen Runner-Läufen ändern; ein Update über eine bestehende Installation ist nicht garantiert. Vorher JSON exportieren, alte Version deinstallieren, JSON importieren.
 - Bekannte nicht blockierende Meldung: `actions/upload-artifact@v5` läuft auf Node 24 statt Node 20 (Deprecation-Hinweis); der Release-Pfad ist nicht betroffen.
 - **Weiterhin kein Gerätetest:** Installation, FileProvider-Sharing, PDF-Öffnen/Speichern, OCR, Persistenz, Tastatur, Back-Taste und beide Ausrichtungsmodi wurden nicht auf einem Android-Gerät oder Emulator geprüft.
+
+## 10. Erweiterung v1.4.0
+
+### 10.1 Automatische Prüfungen
+
+| Prüfung | Ergebnis |
+|---|---|
+| `npm run typecheck` | ohne Fehler |
+| `npm test` | **82/82 bestanden**, 0 Fehler, 0 übersprungen |
+| `npm run build` | erfolgreich, **2390 Module** transformiert |
+| `npx cap sync android` | erfolgreich; `@capacitor/app@8.1.2`, `@capacitor/filesystem@8.1.5`, `@capacitor/share@8.0.3` registriert |
+| Versionsstand | `package.json` und `package-lock.json`: `1.4.0`; `android/app/build.gradle`: versionCode `6`, versionName `1.4.0` |
+
+Neue Unit-Tests: `src/creation.test.ts` (43 Formate, genau eine richtige Antwort bei Multiple Choice, zwei Optionen bei Wahr/Falsch und Aussagen, Lückentext, Formaterkennung, Lernziele, Blockumstellung, Validierung, lokale Korrektur, Speichern/Laden) und `src/to-teach-flows.test.ts` (Unterrichtsreihe, Reihenfolge, Scaffolding mit vier Phasen und echte PDF-Blöcke). Die vorhandenen i18n-Tests prüfen, dass alle neuen Texte in allen fünf Sprachen vorhanden sind.
+
+### 10.2 Browser-Ende-zu-Ende auf sauberem Profil
+
+Umgebung: Chromium im OpenCode-Review-Pane, Dev-Server `http://localhost:5173`. Vor dem Lauf wurden alte Doppel-Tabs geschlossen und localStorage/IndexedDB geleert. Danach wurde `strahlung.pdf` (3758 Bytes, 1 Seite, 4 belegte Textstellen, 80 % Lesbarkeit) über die Oberfläche hochgeladen. Alle Läufe waren ohne ungefangene Konsolenfehler.
+
+| Artefakt | Ergebnis |
+|---|---|
+| Unterrichtsentwurf | 4 Phasen, Änderung `GEANDERTE STUNDE`, gespeichert, erneut geöffnet, PDF 14.696 Bytes |
+| Arbeitsblatt | 2 Aufgaben, Änderung `GEANDERTE AUFGABE`, gespeichert, erneut geöffnet, PDF 8.757 Bytes |
+| Übungsaufgaben | 2 Aufgaben, Änderung `GEANDERTE ÜBUNG`, gespeichert, erneut geöffnet, PDF 6.074 Bytes |
+| Präsentation | 8 Folien, Änderung `GEANDERTE FOLIE`, gespeichert, erneut geöffnet, PDF 16.191 Bytes |
+| Grafik | 8 Elemente, Änderung `GEANDERTE GRAFIK`, gespeichert, erneut geöffnet, PDF 36.103 Bytes |
+| Unterrichtsreihe | 2 Stunden, Änderung `GEANDERTE REIHE`, gespeichert, erneut geöffnet, PDF 9.385 Bytes |
+| Scaffolding | 4 Phasen, Änderung `GEANDERTE PHASE`, gespeichert, erneut geöffnet, PDF 13.073 Bytes |
+
+Zusätzlich geprüft:
+
+- **Materialbearbeitung:** Der Materialeditor änderte den Dateinamen auf `strahlung-bearbeitet.pdf` und den erkannten Text auf 260 Zeichen bei unveränderter Qualität von 0,8. Der Editor schloss sich, die Erfolgsmeldung erschien und der geänderte Text war nach dem Speichern in der Oberfläche sichtbar.
+- **Fünfstufiger Assistent:** 6 Aufgaben, 26 Gesamtpunkte, 45 Minuten; lokaler KI-Vorschau-Modus blieb ohne Endpunkt deaktiviert. Eine Aufgabe wurde auf `multiple-choice` mit 4 Optionen umgestellt und eine Option bearbeitet. Nach dem Start wurden alle Aufgaben nacheinander beantwortet; Ergebnis `26/26`, `Note 1`, `100 %`.
+- **PDF aus dem Assistenten:** Schülerfassung 10.289 Bytes, Musterlösung 12.822 Bytes; beide Downloads `completed`.
+- **Wiedervorlage und Umbenennung:** „Meine Arbeiten" → „Bearbeiten" öffnete die gespeicherte Arbeit erneut im Assistenten. Der Titel wurde auf `Test Strahlung 1.4` geändert und gespeichert; eine veraltete 0/26-Kopie wurde über den Löschdialog entfernt.
+- **Speicherstabilität:** Ein zwischenzeitlicher Rücksprung auf einen älteren Profilstand ging von mehreren offenen, veralteten Browser-Tabs aus, die denselben lokalen Speicher überschrieben. Nach dem Schließen dieser Tabs und einem sauberen Neustart blieben alle Änderungen erhalten. Die mehrquellige Zusammenführung nach `savedAt` hat dabei keine Daten still gelöscht.
+
+### 10.3 Behobene Probleme in 1.4.0
+
+- Aus zu kurzem Materialtext wurde zunächst ein leeres Arbeitsblatt erzeugt und gespeichert. `makeWorksheet`, `makePresentation` und `makeGraphic` prüfen jetzt das Ergebnis. Ein nachträglicher Browser-Test mit einem auf „Kurz" verkürzten Material erzeugte weder eine Vorschau noch ein neues Artefakt; die Oberfläche zeigte die Meldung „Lade erst Unterrichtsmaterial hoch.".
+- Der Materialeditor und die Artefakt-Editoren schreiben jetzt direkt in das vorhandene Dokument bzw. Artefakt; zuvor gab es keinen durchgängigen Bearbeiten-→-Speichern-→-Erneut-Öffnen-Pfad für alle sieben Artefaktarten.
+- Die neuen Editor- und Wizard-Oberflächen erhielten mobile Styles und stapeln Formulare auf schmalen Viewports.
+
+### 10.4 Weiterhin nicht verifiziert
+
+- Kein lokaler Java-/Gradle-Build: `java`, `JAVA_HOME` und `ANDROID_HOME` fehlen in dieser Umgebung. Der APK-Bau erfolgt ausschließlich im GitHub-Actions-Runner.
+- Kein Android-Gerät und kein Emulator: Installation, Sharing, PDF-Öffnen, OCR, Timer-Ablauf, Tastatur, Back-Taste, Persistenz nach Neustart und beide Ausrichtungen bleiben ungeprüft.
+- Für die responsive Darstellung wurde ein Screenshot erstellt; eine belastbare visuelle Beurteilung aller Breakpoints war in dieser Umgebung nicht möglich.
+- Kein Live-KI-Endpunkt: Der optionale Connector ist nur per Unit-Tests und der sichtbar deaktivierten Vorschau geprüft.
+
+### 10.5 Release v1.4.0
+
+Der Tag `v1.4.0` und der GitHub-Actions-Lauf werden nach dem Commit geprüft; die verifizierten Angaben zu Release, APK-Größe und SHA-256 werden nach Abschluss des Laufs ergänzt.

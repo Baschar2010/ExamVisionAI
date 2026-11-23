@@ -1,6 +1,6 @@
 {
   "name": "examvision-ai",
-  "version": "1.3.0",
+  "version": "1.4.0",
   "description": "Locally processed, source-grounded learning and exam app",
   "main": "index.js",
   "scripts": {
@@ -8,7 +8,7 @@
     "build": "tsc -b && vite build",
     "preview": "vite preview --host 0.0.0.0",
     "typecheck": "tsc --noEmit",
-    "test": "node --experimental-strip-types --test src/core.test.ts src/analytics.test.ts src/pdf-layout.test.ts src/pdf-documents.test.ts src/timer.test.ts src/profile.test.ts src/grading.test.ts src/data-transfer.test.ts src/assistant-router.test.ts src/platform.test.ts src/i18n.test.ts src/file-naming.test.ts src/profile-merge.test.ts"
+    "test": "node --experimental-strip-types --test src/core.test.ts src/analytics.test.ts src/pdf-layout.test.ts src/pdf-documents.test.ts src/timer.test.ts src/profile.test.ts src/grading.test.ts src/data-transfer.test.ts src/assistant-router.test.ts src/platform.test.ts src/i18n.test.ts src/file-naming.test.ts src/profile-merge.test.ts src/creation.test.ts src/to-teach-flows.test.ts"
   },
   "keywords": [],
   "author": "",

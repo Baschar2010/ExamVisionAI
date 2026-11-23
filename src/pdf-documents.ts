@@ -3,6 +3,7 @@ import type { LessonPlan } from './lesson.ts';
 import type { Worksheet } from './worksheet.ts';
 import type { Presentation } from './presentation.ts';
 import type { GraphicModel } from './graphics.ts';
+import type { ScaffoldingPlan, UnitPlan } from './to-teach-flows.ts';
 import { imageBlock, tableBlocks, textBlocks, type PdfBlock, type PdfImage } from './pdf-layout.ts';
 
 export type PdfDocumentLabels = Record<string, string>;
@@ -125,12 +126,60 @@ export function buildGraphicBlocks(model: GraphicModel, labels: PdfDocumentLabel
   return blocks;
 }
 
+export function buildUnitBlocks(plan: UnitPlan, labels: PdfDocumentLabels): PdfBlock[] {
+  const blocks = textBlocks([
+    { text: plan.title, size: 18, gapAfter: 5 },
+    { text: `${value(labels, 'subject', 'Fach')}: ${plan.subject || '—'} · ${value(labels, 'topic', 'Thema')}: ${plan.topic || '—'}`, size: 10, gapAfter: 6 },
+    { text: value(labels, 'objectives', 'Lernziele'), size: 13, gapAfter: 3 },
+    ...plan.objectives.map(objective => ({ text: `• ${objective}`, size: 10 })),
+    { text: value(labels, 'unitLessons', 'Unterrichtsstunden'), size: 13, gapAfter: 3 }
+  ]);
+  blocks.push(...tableBlocks(
+    [value(labels, 'taskLabel', 'Nr.'), value(labels, 'lesson', 'Stunde'), value(labels, 'minutesShort', 'Min'), value(labels, 'description', 'Inhalt')],
+    plan.lessons.map((lesson, index) => [String(index + 1), lesson.title, String(lesson.minutes), lesson.description]),
+    { widths: [12, 56, 16, 88], id: 'unit-lessons' }
+  ));
+  for (const lesson of plan.lessons) {
+    blocks.push(...textBlocks([
+      { text: `${value(labels, 'objectives', 'Lernziele')}: ${lesson.objectives.join(' · ') || '—'}`, size: 9 },
+      { text: `${value(labels, 'unitCompetencies', 'Kompetenzen')}: ${lesson.competencies.join(', ') || '—'}`, size: 9 },
+      { text: `${value(labels, 'source', 'Quelle')}: ${lesson.source || '—'}`, size: 9, gapAfter: 4 }
+    ]));
+  }
+  return blocks;
+}
+
+export function buildScaffoldingBlocks(plan: ScaffoldingPlan, labels: PdfDocumentLabels): PdfBlock[] {
+  const blocks = textBlocks([
+    { text: plan.title, size: 18, gapAfter: 5 },
+    { text: `${value(labels, 'subject', 'Fach')}: ${plan.subject || '—'} · ${value(labels, 'topic', 'Thema')}: ${plan.topic || '—'}`, size: 10, gapAfter: 6 },
+    { text: value(labels, 'objectives', 'Lernziele'), size: 13, gapAfter: 3 },
+    ...plan.objectives.map(objective => ({ text: `• ${objective}`, size: 10 })),
+    { text: value(labels, 'phases', 'Phasen'), size: 13, gapAfter: 3 }
+  ]);
+  blocks.push(...tableBlocks(
+    [value(labels, 'phase', 'Phase'), value(labels, 'subjectObjective', 'Fachziel'), value(labels, 'languageObjective', 'Sprachziel')],
+    plan.phases.map(phase => [phase.name, phase.subjectObjective, phase.languageObjective]),
+    { widths: [42, 66, 64], id: 'scaffold-phases' }
+  ));
+  for (const phase of plan.phases) {
+    blocks.push(...textBlocks([
+      { text: `${value(labels, 'scaffoldTask', 'Aufgabe')}: ${phase.task}`, size: 9 },
+      { text: `${value(labels, 'scaffoldSupport', 'Unterstützung')}: ${phase.support}`, size: 9 },
+      { text: `${value(labels, 'scaffoldNext', 'Nächster Schritt')}: ${phase.nextStep}`, size: 9, gapAfter: 4 }
+    ]));
+  }
+  return blocks;
+}
+
 export function buildArtifactPdfBlocks(artifact: Artifact, labels: PdfDocumentLabels, graphicImage?: PdfImage): PdfBlock[] {
   const header = textBlocks([{ text: artifact.title, size: 15, gapAfter: 4 }]);
   if (artifact.kind === 'lesson') return [...header, ...buildLessonBlocks(artifact.data as LessonPlan, labels)];
   if (artifact.kind === 'worksheet' || artifact.kind === 'practice') return buildWorksheetBlocks(artifact.data as Worksheet, labels);
   if (artifact.kind === 'presentation') return buildPresentationBlocks(artifact.data as Presentation, labels);
   if (artifact.kind === 'graphic') return buildGraphicBlocks(artifact.data as GraphicModel, labels, graphicImage);
+  if (artifact.kind === 'unit') return [...header, ...buildUnitBlocks(artifact.data as UnitPlan, labels)];
+  if (artifact.kind === 'scaffolding') return [...header, ...buildScaffoldingBlocks(artifact.data as ScaffoldingPlan, labels)];
   return header;
 }
 
