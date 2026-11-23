@@ -9,25 +9,110 @@ permissions:
   contents: write
 
 jobs:
-  apk:
+  build-and-release:
+    name: Debug-APK bauen und Release veröffentlichen
     runs-on: ubuntu-latest
+
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - name: Tag auschecken
+        uses: actions/checkout@v4
         with:
-          node-version: 22
+          fetch-depth: 0
+
+      - name: Node.js einrichten
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
           cache: npm
-      - uses: actions/setup-java@v4
+
+      - name: JDK 21 einrichten
+        uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: '21'
-      - run: npm ci
-      - run: npm run build
-      - run: npx cap sync android
-      - run: ./gradlew assembleDebug
+
+      - name: Android SDK prüfen
+        run: |
+          echo "ANDROID_HOME=$ANDROID_HOME"
+          if [ ! -d "$ANDROID_HOME/platforms/android-36" ]; then
+            echo "Android SDK Plattform 36 fehlt und wird nachinstalliert."
+            if command -v sdkmanager >/dev/null 2>&1; then
+              yes | sdkmanager --install "platforms;android-36" "build-tools;36.0.0"
+            elif [ -x "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" ]; then
+              yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --install "platforms;android-36" "build-tools;36.0.0"
+            else
+              echo "::error::Android SDK Plattform 36 fehlt und sdkmanager ist nicht verfügbar."
+              exit 1
+            fi
+          fi
+
+      - name: Abhängigkeiten installieren
+        run: npm ci
+
+      - name: Tests ausführen
+        run: npm test
+
+      - name: Website bauen
+        run: npm run build
+
+      - name: Capacitor-Projekt synchronisieren
+        run: npx cap sync android
+
+      - name: Debug-APK bauen
         working-directory: android
-      - name: Publish APK for tagged version
+        run: |
+          chmod +x ./gradlew
+          ./gradlew assembleDebug --no-daemon
+
+      - name: APK prüfen
+        id: apk
+        run: |
+          APK="android/app/build/outputs/apk/debug/app-debug.apk"
+          test -s "$APK"
+          echo "APK-Größe: $(stat -c%s "$APK") Bytes"
+          unzip -t "$APK" > /dev/null
+          echo "APK-Archiv ist intakt."
+          AAPT=$(find "$ANDROID_HOME/build-tools" -name aapt -type f 2>/dev/null | sort -V | tail -n 1)
+          if [ -n "$AAPT" ]; then
+            "$AAPT" dump badging "$APK" | head -n 3
+          fi
+
+      - name: APK als Build-Artefakt speichern
+        uses: actions/upload-artifact@v4
+        with:
+          name: ExamVisionAI-${{ github.ref_name }}-debug-apk
+          path: android/app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
+
+      - name: Release-Notizen erstellen
+        env:
+          TAG: ${{ github.ref_name }}
+        run: |
+          cat > release-notes.md <<EOF
+          ExamVision AI ${TAG} – Debug-APK zum Testen.
+
+          - Paket: ai.examvision.app
+          - Version: ${TAG} (siehe auch APK-Badging)
+          - Signatur: Android-Debug-Schlüssel – nicht offiziell signiert, nicht für den Play Store bestimmt
+          - Mindestanforderung: Android 7.0 (API 24)
+
+          Download: Die Datei "ExamVisionAI-${TAG}-debug.apk" unten herunterladen und auf dem Android-Gerät öffnen. Falls nötig, einmalig die Installation unbekannter Apps erlauben.
+
+          Hinweise zur Installation und zu bekannten Grenzen:
+          https://github.com/Baschar2010/ExamVisionAI/blob/main/INSTALL.md
+          https://github.com/Baschar2010/ExamVisionAI/blob/main/TEST-REPORT.md
+          EOF
+
+      - name: GitHub Release mit APK erstellen
         env:
           GH_TOKEN: ${{ github.token }}
           TAG: ${{ github.ref_name }}
-        run: gh release create "$TAG" android/app/build/outputs/apk/debug/app-debug.apk --generate-notes --title "$TAG"
+        run: |
+          APK="android/app/build/outputs/apk/debug/app-debug.apk"
+          ASSET="ExamVisionAI-${TAG}-debug.apk"
+          cp "$APK" "$ASSET"
+          gh release create "$TAG" "${ASSET}#${ASSET} (debug-signiert)" \
+            --title "ExamVision AI ${TAG} – Debug-APK" \
+            --notes-file release-notes.md \
+            --verify-tag
+          echo "Release $TAG wurde mit $ASSET veröffentlicht."

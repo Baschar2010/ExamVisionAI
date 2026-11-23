@@ -77,7 +77,24 @@ cd android
 .\gradlew.bat assembleDebug --no-daemon
 ```
 
-Die APK liegt dann unter `android/app/build/outputs/apk/debug/app-debug.apk`. Eine geprüfte Kopie liegt unter `release/ExamVisionAI-1.1-debug.apk`. Für einen signierten Release einen eigenen Keystore verwenden und nie in Git committen.
+Die APK liegt dann unter `android/app/build/outputs/apk/debug/app-debug.apk`. Eine lokal geprüfte Kopie des Standes 1.1 liegt unter `release/ExamVisionAI-1.1-debug.apk`. Aktuelle Download-APKs entstehen automatisch unter [GitHub Releases](https://github.com/Baschar2010/ExamVisionAI/releases). Für einen offiziell signierten Release einen eigenen Keystore verwenden und nie in Git committen; die automatisierten APKs sind ausdrücklich nur debug-signiert.
+
+## Release veröffentlichen (GitHub Actions)
+
+Ein Push eines Tags nach `v*` startet den Workflow `.github/workflows/android-release.yml`. Er installiert die Abhängigkeiten, führt `npm test` und `npm run build` aus, synchronisiert Capacitor, baut mit JDK 21 die Debug-APK, legt ein Build-Artefakt an und erstellt anschließend ein GitHub Release mit der benannten APK als Download.
+
+So veröffentlichst du eine neue Version:
+
+1. Änderungen committen und nach `main` pushen: `git push origin main`.
+2. Version anheben: `versionCode` und `versionName` in `android/app/build.gradle` sowie `version` in `package.json` und `package-lock.json` (z. B. `1.3.0`, `versionCode 4`). Erneut committen und pushen.
+3. Tag erstellen und pushen:
+   ```bash
+   git tag -a v1.3.0 -m "ExamVision AI 1.3.0"
+   git push origin v1.3.0
+   ```
+4. Den Lauf unter [Actions](https://github.com/Baschar2010/ExamVisionAI/actions) prüfen. Nach Erfolg steht das Release unter [Releases](https://github.com/Baschar2010/ExamVisionAI/releases) mit der Datei `ExamVisionAI-v1.3.0-debug.apk` bereit.
+
+Der Titel des Releases lautet `ExamVision AI <Tag> – Debug-APK`. In den Release-Notizen steht ausdrücklich, dass die APK mit dem Android-Debug-Schlüssel signiert und nicht offiziell signiert ist. Es werden keine Tokens, Passwörter oder privaten Schlüssel im Repository benötigt; der Workflow nutzt nur das automatisch bereitgestellte `github.token` mit `contents: write`.
 
 ## Datenschutz und Konfiguration
 

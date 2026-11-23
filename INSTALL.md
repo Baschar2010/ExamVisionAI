@@ -30,7 +30,11 @@ npm run preview
 
 ## 2. Android-APK installieren
 
-### Geprüfte Datei
+### Aktueller Download
+
+Die jeweils aktuelle, automatisch gebaute APK liegt unter [GitHub Releases](https://github.com/Baschar2010/ExamVisionAI/releases). Dort die Datei `ExamVisionAI-<Tag>-debug.apk` des gewünschten Releases herunterladen (z. B. `ExamVisionAI-v1.2.0-debug.apk`). Der Release-Titel und die Datei enthalten den Versionstag. Diese APK ist mit dem Android-Debug-Schlüssel signiert und ausdrücklich **nicht offiziell signiert**.
+
+### Lokal geprüfte Datei (Stand 1.1)
 
 | Merkmal | Wert |
 |---|---|
@@ -85,7 +89,7 @@ cd android
 .\gradlew.bat assembleDebug --no-daemon
 ```
 
-Danach die APK aus `android/app/build/outputs/apk/debug/app-debug.apk` nach `release/ExamVisionAI-1.1-debug.apk` kopieren. Für einen echten Release einen eigenen Keystore verwenden und diesen nie versionieren.
+Danach die APK aus `android/app/build/outputs/apk/debug/app-debug.apk` nach `release/ExamVisionAI-<Version>-debug.apk` kopieren. Für einen offiziell signierten Release einen eigenen Keystore verwenden und diesen nie versionieren. Wie ein Tag automatisch ein GitHub Release mit APK erzeugt, steht in [README.md](README.md#release-veröffentlichen-github-actions).
 
 ## 5. Probleme
 
